@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 import { BRAND } from '@/constants/brand';
+import { useTranslation } from 'react-i18next';
 
 export type Section =
   | 'overview'
@@ -60,11 +61,12 @@ export function Sidebar({
   onClose,
   onToggle,
 }: SidebarProps) {
+  const { t } = useTranslation();
   return (
     <>
       <button
         className="mobile-menu-trigger"
-        aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
+        aria-label={mobileOpen ? t('Close navigation') : t('Open navigation')}
         onClick={onToggle}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -72,7 +74,7 @@ export function Sidebar({
       {mobileOpen ? (
         <button
           className="sidebar-backdrop"
-          aria-label="Close navigation"
+          aria-label={t('Close navigation')}
           onClick={onClose}
         />
       ) : null}
@@ -83,9 +85,9 @@ export function Sidebar({
           </div>
           <div className="brand-copy">
             <strong>{BRAND.NAME}</strong>
-            <span>ADMIN CONSOLE</span>
+            <span>{t('ADMIN CONSOLE')}</span>
           </div>
-          <button className="sidebar-collapse" aria-label="Collapse sidebar">
+          <button className="sidebar-collapse" aria-label={t('Collapse sidebar')}>
             <ChevronDown size={15} />
           </button>
         </div>
@@ -94,13 +96,13 @@ export function Sidebar({
           <span className="workspace-avatar">K</span>
           <span className="workspace-copy">
             <strong>KaaamNow</strong>
-            <small>Operations workspace</small>
+            <small>{t('Operations workspace')}</small>
           </span>
           <ChevronDown size={15} />
         </div>
 
-        <nav className="primary-nav" aria-label="Main navigation">
-          <p className="nav-label">WORKSPACE</p>
+        <nav className="primary-nav" aria-label={t('Main navigation')}>
+          <p className="nav-label">{t('WORKSPACE')}</p>
           {navigation.slice(0, 5).map(item => (
             <NavItem
               key={item.id}
@@ -113,7 +115,7 @@ export function Sidebar({
             />
           ))}
 
-          <p className="nav-label nav-label-spaced">MANAGEMENT</p>
+          <p className="nav-label nav-label-spaced">{t('MANAGEMENT')}</p>
           {navigation.slice(5).map(item => (
             <NavItem
               key={item.id}
@@ -131,21 +133,21 @@ export function Sidebar({
         <div className="sidebar-bottom">
           <button className="sidebar-link">
             <Activity size={17} />
-            <span>Activity log</span>
+            <span>{t('Activity log')}</span>
           </button>
           <button className="sidebar-link">
             <Settings2 size={17} />
-            <span>Settings</span>
+            <span>{t('Settings')}</span>
           </button>
           <button className="sidebar-link">
             <CircleHelp size={17} />
-            <span>Help & support</span>
+            <span>{t('Help & support')}</span>
           </button>
           <div className="sidebar-user">
             <div className="user-avatar admin-avatar">AS</div>
             <div className="user-copy">
-              <strong>Admin Sarah</strong>
-              <small>Super admin</small>
+              <strong>{t('Admin Sarah')}</strong>
+              <small>{t('Super admin')}</small>
             </div>
             <LogOut size={16} />
           </div>
@@ -166,6 +168,7 @@ function NavItem({
   badge?: number;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   const Icon = item.icon;
   return (
     <button
@@ -174,7 +177,7 @@ function NavItem({
       onClick={onClick}
     >
       <Icon size={18} strokeWidth={active ? 2.1 : 1.8} />
-      <span>{item.label}</span>
+      <span>{t(item.label)}</span>
       {item.badge && badge ? <b className="nav-badge">{badge}</b> : null}
     </button>
   );

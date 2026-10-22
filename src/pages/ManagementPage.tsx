@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { StatusBadge } from '@/components/StatusBadge';
 import { ManagementMetrics, type ManagementMetric } from '@/components/ManagementMetrics';
@@ -26,6 +27,7 @@ import type {
 } from '@/types';
 import { downloadCsv } from '@/utils/csv';
 import { formatRupees, initialsOf } from '@/utils/format';
+import { translateText } from '@/i18n';
 
 export type AdminSection =
   | 'workers'
@@ -84,8 +86,8 @@ const sectionMeta: Record<AdminSection, { title: string; description: string; la
   support: { title: 'Support', description: 'Track critical issues raised by workers and businesses across the platform.', label: 'SUPPORT TICKETS', action: 'Export tickets', columns: ['Subject', 'Raised by', 'Category', 'Priority', 'Status'] },
 };
 
-const dateLabel = (value: string) =>
-  new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
+const dateLabel = (value: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
 
 const statusTone = (status: string): Row['statusTone'] => {
   const normalized = normalizeStatus(status);
@@ -117,6 +119,8 @@ export function ManagementPage({
   onUpdatePayout,
   onResolveTicket,
 }: ManagementPageProps) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage === 'hi' ? 'hi-IN' : i18n.resolvedLanguage === 'kn' ? 'kn-IN' : 'en-IN';
   const meta = sectionMeta[section];
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [attributeFilter, setAttributeFilter] = useState('All categories');
@@ -135,14 +139,15 @@ export function ManagementPage({
         payouts,
         supportTickets,
         approvals,
+        locale,
       ),
-    [section, workers, businesses, shifts, payments, payouts, supportTickets, approvals],
+    [section, workers, businesses, shifts, payments, payouts, supportTickets, approvals, locale],
   );
   const matchingRows = rows.filter(row => {
     const query = search.trim().toLowerCase();
     const matchesSearch =
       !query ||
-      [row.id, row.title, row.subtitle, row.status, ...row.cells]
+      [row.id, row.title, row.subtitle, row.status, ...row.cells, ...[row.status, ...row.cells].map(translateText)]
         .join(' ')
         .toLowerCase()
         .includes(query);
@@ -165,8 +170,8 @@ export function ManagementPage({
   const exportRows = (rowsToExport: Row[]) => {
     downloadCsv(
       `kaaamnow-${section}`,
-      [...meta.columns, 'Record ID'],
-      rowsToExport.map(row => [row.title, ...row.cells, row.status, row.id]),
+      [...meta.columns.map(column => t(column)), t('Record ID')],
+      rowsToExport.map(row => [translateText(row.title), ...row.cells.map(translateText), translateText(row.status), row.id]),
     );
   };
 
@@ -177,24 +182,24 @@ export function ManagementPage({
       <section className="page-title-row">
         <div>
           <div className="eyebrow-row">
-            <span className="eyebrow">{meta.label}</span>
+            <span className="eyebrow">{t(meta.label)}</span>
             <span className="title-divider">/</span>
-            <span className="eyebrow-sub">Bengaluru marketplace</span>
+            <span className="eyebrow-sub">{t('Bengaluru marketplace')}</span>
           </div>
-          <h1>{meta.title}</h1>
-          <p className="page-description">{meta.description}</p>
+          <h1>{t(meta.title)}</h1>
+          <p className="page-description">{t(meta.description)}</p>
         </div>
         <button className="button button-secondary" onClick={() => exportRows(rows)}>
           <ArrowDownToLine size={16} />
-          {meta.action}
+          {t(meta.action)}
         </button>
       </section>
 
       {section === 'approvals' ? (
         <div className="approval-summary">
           <div className="approval-summary-icon"><ShieldCheck size={20} /></div>
-          <div><strong>{pendingApprovals.length} requests need review</strong><span>Review submitted documents to keep the marketplace safe.</span></div>
-          <span className="approval-sla"><Clock3 size={14} /> Average review time: 2.4 hrs</span>
+          <div><strong>{t('{{count}} requests need review', { count: pendingApprovals.length })}</strong><span>{t('Review submitted documents to keep the marketplace safe.')}</span></div>
+          <span className="approval-sla"><Clock3 size={14} /> {t('Average review time: {{hours}} hrs', { hours: 2.4 })}</span>
         </div>
       ) : (
         <ManagementMetrics metrics={metrics} />
@@ -203,42 +208,42 @@ export function ManagementPage({
       <section className="panel data-panel">
         <div className="data-toolbar">
           <div className="data-heading">
-            <h2>{section === 'approvals' ? 'Requests to review' : meta.title}</h2>
+            <h2>{section === 'approvals' ? t('Requests to review') : t(meta.title)}</h2>
             <span className="data-count">{matchingRows.length}</span>
           </div>
           <div className="table-actions">
             <label className="table-search">
               <Search size={16} />
               <input
-                aria-label={`Search ${meta.title.toLowerCase()}`}
-                placeholder={`Search ${meta.title.toLowerCase()}...`}
+                aria-label={t('Search {{section}}', { section: t(meta.title).toLowerCase() })}
+                placeholder={t('Search {{section}}...', { section: t(meta.title).toLowerCase() })}
                 value={search}
                 onChange={event => onSearch(event.target.value)}
               />
             </label>
             <label className="filter-select">
-              <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label="Filter by status">
-                <option>All statuses</option>
-                {[...new Set(rows.map(row => row.status))].map(status => <option key={status}>{status}</option>)}
+              <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t('Filter by status')}>
+                <option value="All statuses">{t('All statuses')}</option>
+                {[...new Set(rows.map(row => row.status))].map(status => <option key={status} value={status}>{translateText(status)}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
             <label className="filter-select">
-              <select value={attributeFilter} onChange={event => setAttributeFilter(event.target.value)} aria-label="Filter by category or field">
-                <option>All categories</option>
-                {filterOptions.map(value => <option key={value}>{value}</option>)}
+              <select value={attributeFilter} onChange={event => setAttributeFilter(event.target.value)} aria-label={t('Filter by category or field')}>
+                <option value="All categories">{t('All categories')}</option>
+                {filterOptions.map(value => <option key={value} value={value}>{translateText(value)}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
-            <button className="button button-secondary table-export" onClick={() => exportRows(matchingRows)}><ArrowDownToLine size={15} /> Export</button>
+            <button className="button button-secondary table-export" onClick={() => exportRows(matchingRows)}><ArrowDownToLine size={15} /> {t('Export')}</button>
           </div>
         </div>
         <div className="table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
-                {meta.columns.map(column => <th key={column}>{column}</th>)}
-                <th><span className="sr-only">Actions</span></th>
+                {meta.columns.map(column => <th key={column}>{t(column)}</th>)}
+                <th><span className="sr-only">{t('Actions')}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -247,11 +252,11 @@ export function ManagementPage({
                   <td>
                     <button className="identity-cell" onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}>
                       <span className={`user-avatar avatar-${row.avatarTone}`}>{row.avatar}</span>
-                      <span><strong>{row.title}</strong><small>{row.id} · {row.subtitle}</small></span>
+                      <span><strong>{translateText(row.title)}</strong><small>{row.id} · {translateText(row.subtitle)}</small></span>
                     </button>
                   </td>
                   {row.cells.map((cell, index) => (
-                    <td key={`${row.id}-${index}`} className={index === 0 ? 'table-primary-cell' : ''}>{cell}</td>
+                    <td key={`${row.id}-${index}`} className={index === 0 ? 'table-primary-cell' : ''}>{translateText(cell)}</td>
                   ))}
                   <td>
                     <StatusBadge tone={row.statusTone}>{row.status}</StatusBadge>
@@ -259,52 +264,52 @@ export function ManagementPage({
                   <td>
                     {section === 'approvals' && matchesStatus(row.status, 'pending') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={`View ${row.title}`} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={`Approve ${row.title}`} onClick={() => onReviewApproval(row.id, 'approved')}><Check size={15} /></button>
-                        <button className="approval-action reject-action" aria-label={`Reject ${row.title}`} onClick={() => onReviewApproval(row.id, 'rejected')}><X size={15} /></button>
+                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={t('Approve {{name}}', { name: row.title })} onClick={() => onReviewApproval(row.id, 'approved')}><Check size={15} /></button>
+                        <button className="approval-action reject-action" aria-label={t('Reject {{name}}', { name: row.title })} onClick={() => onReviewApproval(row.id, 'rejected')}><X size={15} /></button>
                       </div>
                     ) : section === 'support' && onResolveTicket && !matchesStatus(row.status, 'resolved') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={`View ${row.title}`} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={`Resolve ${row.title}`} onClick={() => onResolveTicket(row.id)}><Check size={15} /></button>
+                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={t('Resolve {{name}}', { name: row.title })} onClick={() => onResolveTicket(row.id)}><Check size={15} /></button>
                       </div>
                     ) : section === 'payouts' && onUpdatePayout && matchesStatus(row.status, 'pending') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={`View ${row.title}`} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={`Start processing ${row.title} payout`} onClick={() => onUpdatePayout(row.id, 'processing')}><ArrowRight size={15} /></button>
+                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={t('Start processing payout for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'processing')}><ArrowRight size={15} /></button>
                       </div>
                     ) : section === 'payouts' && onUpdatePayout && matchesStatus(row.status, 'processing') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={`View ${row.title}`} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={`Mark ${row.title} payout completed`} onClick={() => onUpdatePayout(row.id, 'completed')}><Check size={15} /></button>
+                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={t('Mark payout completed for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'completed')}><Check size={15} /></button>
                       </div>
                     ) : (
                       <div className="last-cell-actions">
-                        <button className="icon-button row-view" aria-label={`View ${row.title}`} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><MoreHorizontal size={17} /></button>
+                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><MoreHorizontal size={17} /></button>
                       </div>
                     )}
                   </td>
                 </tr>
               ))}
               {matchingRows.length === 0 ? (
-                <tr><td colSpan={meta.columns.length + 1}><div className="empty-table"><Search size={22} /><strong>No matching records</strong><span>Try another search or clear the selected status filter.</span></div></td></tr>
+                <tr><td colSpan={meta.columns.length + 1}><div className="empty-table"><Search size={22} /><strong>{t('No matching records')}</strong><span>{t('Try another search or clear the selected status filter.')}</span></div></td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
         <div className="table-pagination">
-          <span>Showing <strong>{matchingRows.length ? 1 : 0}–{matchingRows.length}</strong> of <strong>{matchingRows.length}</strong> results</span>
-          <div><button disabled>Previous</button><button className="page-current">1</button><button disabled>Next</button></div>
+          <span>{t('Showing {{start}}–{{end}} of {{total}} results', { start: matchingRows.length ? 1 : 0, end: matchingRows.length, total: matchingRows.length })}</span>
+          <div><button disabled>{t('Previous')}</button><button className="page-current">1</button><button disabled>{t('Next')}</button></div>
         </div>
       </section>
-      <div className="table-footnote"><span>Data refreshes automatically</span><span>Last updated a few seconds ago <ArrowRight size={13} /></span></div>
+      <div className="table-footnote"><span>{t('Data refreshes automatically')}</span><span>{t('Last updated a few seconds ago')} <ArrowRight size={13} /></span></div>
 
       {section === 'approvals' && pendingApprovals.length === 0 ? (
-        <div className="all-reviewed"><Check size={16} /> All verification requests have been reviewed.</div>
+        <div className="all-reviewed"><Check size={16} /> {t('All verification requests have been reviewed.')}</div>
       ) : null}
 
       {section === 'support' && supportTickets.filter(ticket => ticket.status !== 'resolved').length === 0 ? (
-        <div className="all-reviewed"><Check size={16} /> All support tickets have been resolved.</div>
+        <div className="all-reviewed"><Check size={16} /> {t('All support tickets have been resolved.')}</div>
       ) : null}
     </div>
   );
@@ -371,6 +376,7 @@ function getRows(
   payouts: Payout[],
   supportTickets: SupportTicket[],
   approvals: VerificationRequest[],
+  locale: string,
 ): Row[] {
   if (section === 'workers') {
     return workers.map((worker, index) => ({
@@ -392,7 +398,7 @@ function getRows(
         { label: 'Completed shifts', value: String(worker.completedShifts) },
         { label: 'Total earnings', value: formatRupees(worker.totalEarnings) },
         { label: 'Payout account', value: worker.payout.destination },
-        { label: 'Joined', value: dateLabel(worker.joinedAt) },
+        { label: 'Joined', value: dateLabel(worker.joinedAt, locale) },
       ],
     }));
   }
@@ -429,7 +435,7 @@ function getRows(
       subtitle: `${titleCase(shift.kind)} · ${shift.area}`,
       avatar: initialsOf(shift.businessName),
       avatarTone: index % 5,
-      cells: [shift.businessName, `${dateLabel(shift.date)} · ${shift.startTime}`, `${shift.assignments.length} / ${shift.workersNeeded}`, `${formatRupees(shift.hourlyRate)} / hr`],
+      cells: [shift.businessName, `${dateLabel(shift.date, locale)} · ${shift.startTime}`, `${shift.assignments.length} / ${shift.workersNeeded}`, `${formatRupees(shift.hourlyRate)} / hr`],
       status: titleCase(shift.status),
       statusTone: statusTone(shift.status),
       detailType: 'record',
@@ -437,7 +443,7 @@ function getRows(
         { label: 'Business', value: shift.businessName },
         { label: 'Category', value: titleCase(shift.category) },
         { label: 'Location', value: shift.area },
-        { label: 'Date and time', value: `${dateLabel(shift.date)} · ${shift.startTime}–${shift.endTime}` },
+        { label: 'Date and time', value: `${dateLabel(shift.date, locale)} · ${shift.startTime}–${shift.endTime}` },
         { label: 'Workers', value: `${shift.assignments.length} assigned of ${shift.workersNeeded}` },
         { label: 'Hourly rate', value: `${formatRupees(shift.hourlyRate)} / hr` },
         { label: 'Applicants', value: String(shift.applicants) },
@@ -454,7 +460,7 @@ function getRows(
       subtitle: `${payment.workers} worker${payment.workers === 1 ? '' : 's'} · ${payment.role}`,
       avatar: '₹',
       avatarTone: index % 5,
-      cells: [payment.businessName, dateLabel(payment.createdAt), titleCase(payment.method), formatRupees(payment.amount)],
+      cells: [payment.businessName, dateLabel(payment.createdAt, locale), titleCase(payment.method), formatRupees(payment.amount)],
       status: titleCase(payment.status),
       statusTone: statusTone(payment.status),
       detailType: 'record',
@@ -466,7 +472,7 @@ function getRows(
         { label: 'Platform fee', value: formatRupees(payment.platformFee) },
         { label: 'Total amount', value: formatRupees(payment.amount) },
         { label: 'Method', value: titleCase(payment.method) },
-        { label: 'Date', value: new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(payment.createdAt)) },
+        { label: 'Date', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(payment.createdAt)) },
         { label: 'Status', value: titleCase(payment.status) },
       ],
     }));
@@ -479,7 +485,7 @@ function getRows(
       subtitle: payout.reference,
       avatar: initialsOf(payout.workerName),
       avatarTone: index % 5,
-      cells: [payout.method, dateLabel(payout.requestedAt), formatRupees(payout.amount)],
+      cells: [payout.method, dateLabel(payout.requestedAt, locale), formatRupees(payout.amount)],
       status: titleCase(payout.status),
       statusTone: statusTone(payout.status),
       detailType: 'record',
@@ -488,7 +494,7 @@ function getRows(
         { label: 'Reference', value: payout.reference },
         { label: 'Method', value: payout.method },
         { label: 'Destination', value: payout.destination },
-        { label: 'Requested at', value: new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(payout.requestedAt)) },
+        { label: 'Requested at', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(payout.requestedAt)) },
         { label: 'Amount', value: formatRupees(payout.amount) },
         { label: 'Status', value: titleCase(payout.status) },
       ],
@@ -511,7 +517,7 @@ function getRows(
         { label: 'Category', value: titleCase(ticket.category) },
         { label: 'Priority', value: titleCase(ticket.priority) },
         { label: 'Status', value: titleCase(ticket.status) },
-        { label: 'Created', value: new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ticket.createdAt)) },
+        { label: 'Created', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ticket.createdAt)) },
         { label: 'Message', value: ticket.message },
         { label: 'Shift', value: ticket.shiftId ?? 'Not linked' },
       ],
@@ -526,7 +532,7 @@ function getRows(
     avatarTone: index % 5,
     cells: [
       `${titleCase(approval.subject)} · ${approval.phone}`,
-      new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(approval.submittedAt)),
+      new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(approval.submittedAt)),
       `${approval.documents.length} documents`,
     ],
     status: titleCase(approval.status),
@@ -536,7 +542,7 @@ function getRows(
       { label: 'Applicant type', value: titleCase(approval.subject) },
       { label: 'Phone', value: approval.phone },
       { label: 'Location', value: approval.area },
-      { label: 'Submitted', value: new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(approval.submittedAt)) },
+      { label: 'Submitted', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(approval.submittedAt)) },
       ...approval.documents.map(document => ({ label: titleCase(document.type), value: document.number })),
       { label: 'Review status', value: titleCase(approval.status) },
     ],

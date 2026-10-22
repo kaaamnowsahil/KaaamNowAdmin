@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type MetricCardProps = {
   label: string;
@@ -9,6 +10,7 @@ type MetricCardProps = {
   icon: LucideIcon;
   iconTone: string;
   note?: string;
+  noteValues?: Record<string, string | number>;
 };
 
 export function MetricCard({
@@ -19,12 +21,14 @@ export function MetricCard({
   icon: Icon,
   iconTone,
   note = 'vs. last month',
+  noteValues,
 }: MetricCardProps) {
+  const { t } = useTranslation();
   const TrendIcon = trend === 'up' ? ArrowUpRight : ArrowDownRight;
   return (
     <article className="metric-card">
       <div className="metric-top">
-        <span>{label}</span>
+        <span>{t(label)}</span>
         <span className={`metric-icon ${iconTone}`}>
           <Icon size={18} strokeWidth={1.8} />
         </span>
@@ -37,7 +41,7 @@ export function MetricCard({
             {change}
           </span>
         ) : null}
-        <span>{note}</span>
+        <span>{t(note, noteValues)}</span>
       </div>
     </article>
   );

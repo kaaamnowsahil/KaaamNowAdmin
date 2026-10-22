@@ -203,6 +203,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .notification-button:hover, .icon-button:hover { color: var(--color-primary); background: #f6f3ff; }
 .notification-button i { position: absolute; top: 6px; right: 7px; width: 7px; height: 7px; border: 1.5px solid white; border-radius: 50%; background: #ed6072; }
 .topbar-divider { width: 1px; height: 26px; margin: 0 4px; background: #e9ebf1; }
+.language-switcher select { min-width: 82px; border: 1px solid #e9ebf1; border-radius: 8px; background: white; color: #30374a; padding: 7px 9px; font: inherit; font-size: 11px; }
 .profile-switch { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .profile-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .profile-copy strong { color: #33384a; font-size: 10px; font-weight: 600; }
