@@ -3,5 +3,5 @@ export const BRAND = {
   NAME: 'KaaamNow',
   PRODUCT: 'KaaamNow Admin',
   LOGO_LABEL: 'KaaamNow logo',
-  SUPPORT_EMAIL: 'support@kaaamnow.app',
+  SUPPORT_EMAILS: ['sumit.pandey@kaaamnow.in', 'sahil.shrivastava@kaaamnow.in'],
 } as const;

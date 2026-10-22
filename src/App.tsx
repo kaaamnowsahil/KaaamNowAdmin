@@ -4,6 +4,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Sidebar, type Section } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
@@ -41,6 +42,7 @@ const pageTitles: Record<Section, string> = {
 };
 
 function App() {
+  const { t } = useTranslation();
   const [section, setSection] = useState<Section>('overview');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -107,9 +109,7 @@ function App() {
       );
     }
 
-    setToast(
-      `${request.name} ${action === 'approved' ? 'approved' : 'rejected'}.`,
-    );
+    setToast(t(action === 'approved' ? 'Approval accepted for {{name}}.' : 'Approval rejected for {{name}}.', { name: request.name }));
     window.setTimeout(() => setToast(''), 3200);
   };
 
@@ -135,7 +135,8 @@ function App() {
           : item,
       ),
     );
-    setToast(`Payout ${payout.reference} marked ${status}.`);
+    const localizedStatus = status.charAt(0).toUpperCase() + status.slice(1);
+    setToast(t('Payout {{reference}} marked {{status}}.', { reference: payout.reference, status: t(localizedStatus) }));
     window.setTimeout(() => setToast(''), 3200);
   };
 
@@ -149,7 +150,7 @@ function App() {
           : item,
       ),
     );
-    setToast('Support ticket resolved.');
+    setToast(t('Support ticket resolved.'));
     window.setTimeout(() => setToast(''), 3200);
   };
 
@@ -172,9 +173,9 @@ function App() {
         />
         <div className="main-content">
           <div className="mobile-page-label">
-            <span>{pageTitles[section]}</span>
+            <span>{t(pageTitles[section])}</span>
             <ChevronRight size={14} />
-            <span>Operations</span>
+            <span>{t('Operations')}</span>
           </div>
           {selectedRecord ? (
             selectedRecord.type === 'worker' ? (
@@ -190,8 +191,8 @@ function App() {
             ) : (
               <RecordDetailPage
                 record={selectedRecord}
-                eyebrow={pageTitles[section].toUpperCase()}
-                description="Review the operational details for this marketplace record."
+                eyebrow={t(pageTitles[section]).toUpperCase()}
+                description={t('Review the operational details for this marketplace record.')}
                 onBack={() => setSelectedRecord(null)}
               />
             )
@@ -258,7 +259,7 @@ function App() {
         <div className="toast-message" role="status">
           <span><Check size={16} /></span>
           {toast}
-          <button aria-label="Dismiss message" onClick={() => setToast('')}>
+          <button aria-label={t('Dismiss message')} onClick={() => setToast('')}>
             <X size={15} />
           </button>
         </div>
