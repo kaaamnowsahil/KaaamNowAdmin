@@ -19,6 +19,10 @@ export type CreateLookupItem = {
   is_active: boolean;
 };
 
+export type UpdateLookupItem = Partial<Omit<CreateLookupItem, 'is_active'>> & {
+  is_active?: boolean;
+};
+
 export type LookupCollection = 'work-categories' | 'business-types';
 
 export async function getLookupItems(
@@ -37,6 +41,22 @@ export async function createLookupItem(
     method: 'POST',
     body: JSON.stringify(category),
   });
+}
+
+export async function updateLookupItem(
+  token: string,
+  collection: LookupCollection,
+  id: string,
+  changes: UpdateLookupItem,
+): Promise<LookupItem> {
+  return apiRequest<LookupItem>(
+    `/api/v1/${collection}/${encodeURIComponent(id)}`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    },
+  );
 }
 
 export async function deleteLookupItem(token: string, collection: LookupCollection, id: string): Promise<void> {

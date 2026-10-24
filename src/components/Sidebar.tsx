@@ -10,6 +10,7 @@ import {
   ListChecks,
   LogOut,
   Settings2,
+  SlidersHorizontal,
   ShieldAlert,
   UsersRound,
   Wallet,
@@ -42,6 +43,7 @@ const navigation: {
   { id: 'support', label: 'Support', icon: CircleHelp },
   { id: 'work-categories', label: 'Work categories', icon: ListChecks },
   { id: 'business-types', label: 'Business / work types', icon: Boxes },
+  { id: 'shift-filters', label: 'Shift filters', icon: SlidersHorizontal },
   { id: 'account-deletion', label: 'Account deletion', icon: ShieldAlert },
 ];
 
