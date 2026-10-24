@@ -1,3 +1,4 @@
+import { formatText } from '@/utils/text';
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -13,9 +14,9 @@ import {
   Plus,
   UsersRound,
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import { MetricCard } from '@/components/MetricCard';
+import { ProfileAvatar } from '@/components/ProfileAvatar';
 import { StatusBadge } from '@/components/StatusBadge';
 import type { AdminShift, Business, Payment, Payout, SupportTicket, Worker } from '@/types';
 import { downloadCsv } from '@/utils/csv';
@@ -49,8 +50,9 @@ export function OverviewPage({
   pendingApprovals,
   onOpenSection,
 }: OverviewPageProps) {
-  const { t, i18n } = useTranslation();
-  const activeBusinesses = businesses.filter(business => business.status === 'active').length;
+  const verifiedBusinesses = businesses.filter(
+    business => business.verificationStatus === 'verified',
+  ).length;
   const paidVolume = payments
     .filter(payment => payment.status === 'paid')
     .reduce((total, payment) => total + payment.amount, 0);
@@ -64,17 +66,17 @@ export function OverviewPage({
   const exportReport = () => {
     downloadCsv(
       'kaaamnow-marketplace-overview',
-      [t('Metric'), t('Value')],
+      ['Metric', 'Value'],
       [
-        [t('Total workers'), workers.length],
-        [t('Active businesses'), activeBusinesses],
-        [t('Businesses total'), businesses.length],
-        [t('Shifts in marketplace'), shifts.length],
-        [t('Shifts needing workers'), shiftsNeedingWorkers],
-        [t('Paid payment volume'), paidVolume],
-        [t('Payouts in progress'), payoutsInProgress],
-        [t('Pending verifications'), pendingApprovals],
-        [t('Unresolved support tickets'), openTickets],
+        ['Total workers', workers.length],
+        ['Verified businesses', verifiedBusinesses],
+        ['Business profiles total', businesses.length],
+        ['Shifts in marketplace', shifts.length],
+        ['Shifts needing workers', shiftsNeedingWorkers],
+        ['Paid payment volume', paidVolume],
+        ['Payouts in progress', payoutsInProgress],
+        ['Pending verifications', pendingApprovals],
+        ['Unresolved support tickets', openTickets],
       ],
     );
   };
@@ -83,26 +85,26 @@ export function OverviewPage({
     <div className="page-stack">
       <section className="welcome-row">
         <div>
-          <p className="eyebrow">{new Intl.DateTimeFormat(i18n.resolvedLanguage === 'hi' ? 'hi-IN' : i18n.resolvedLanguage === 'kn' ? 'kn-IN' : 'en-IN', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date()).toUpperCase()}</p>
-          <h1>{t('Good afternoon, Sarah ')}<span className="wave">✦</span></h1>
-          <p className="page-description">{t('Here’s what’s happening across your marketplace today.')}</p>
+          <p className="eyebrow">{new Intl.DateTimeFormat('en-IN', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date()).toUpperCase()}</p>
+          <h1>{'Good afternoon, Sarah '}<span className="wave">✦</span></h1>
+          <p className="page-description">{'Here’s what’s happening across your marketplace today.'}</p>
         </div>
         <div className="welcome-actions">
           <button className="button button-secondary" onClick={exportReport}>
             <Download size={16} />
-            {t('Export report')}
+            {'Export report'}
           </button>
           <button className="button button-primary" onClick={() => onOpenSection('approvals')}>
             <Plus size={17} />
-            {t('Review queue')}
+            {'Review queue'}
             <span className="button-count">{pendingApprovals}</span>
           </button>
         </div>
       </section>
 
-      <section className="metric-grid" aria-label={t('Marketplace metrics')}>
-        <MetricCard label="Total workers" value={formatCount(workers.length)} note="Worker accounts in this dataset" icon={UsersRound} iconTone="tone-purple" />
-        <MetricCard label="Active businesses" value={formatCount(activeBusinesses)} note="of {{count}} businesses" noteValues={{ count: businesses.length }} icon={Building2} iconTone="tone-blue" />
+      <section className="metric-grid" aria-label={'Marketplace metrics'}>
+        <MetricCard label="Total workers" value={formatCount(workers.length)} note="Worker profiles from the live API" icon={UsersRound} iconTone="tone-purple" />
+        <MetricCard label="Verified businesses" value={formatCount(verifiedBusinesses)} note="of {{count}} live profiles" noteValues={{ count: businesses.length }} icon={Building2} iconTone="tone-blue" />
         <MetricCard label="Shifts in marketplace" value={formatCount(shifts.length)} note="{{count}} need more workers" noteValues={{ count: shiftsNeedingWorkers }} icon={BriefcaseBusiness} iconTone="tone-orange" />
         <MetricCard label="Paid payment volume" value={formatCompactRupees(paidVolume)} note="Successful business charges" icon={CircleDollarSign} iconTone="tone-green" />
       </section>
@@ -111,15 +113,15 @@ export function OverviewPage({
         <article className="panel chart-panel">
           <div className="panel-heading">
             <div>
-              <h2>{t('Marketplace activity')}</h2>
-              <p>{t('Shift volume and worker growth over time')}</p>
+              <h2>{'Marketplace activity'}</h2>
+              <p>{'Shift volume and worker growth over time'}</p>
             </div>
-            <button className="button button-select">{t('Last 30 days')} <ChevronDown size={15} /></button>
+            <button className="button button-select">{'Last 30 days'} <ChevronDown size={15} /></button>
           </div>
           <div className="chart-summary">
             <div>
               <strong>2,408</strong>
-              <span>{t('Total shifts posted')}</span>
+              <span>{'Total shifts posted'}</span>
             </div>
             <span className="chart-period"><ArrowUpRight size={14} /> 18.4%</span>
           </div>
@@ -127,7 +129,7 @@ export function OverviewPage({
             <div className="chart-y-labels">
               <span>3k</span><span>2k</span><span>1k</span><span>0</span>
             </div>
-            <svg className="activity-chart" viewBox="0 0 760 220" role="img" aria-label={t('Marketplace shifts trending upward over the last 30 days')}>
+            <svg className="activity-chart" viewBox="0 0 760 220" role="img" aria-label={'Marketplace shifts trending upward over the last 30 days'}>
               <defs>
                 <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stopColor="#8B5CF6" stopOpacity=".2" />
@@ -140,47 +142,47 @@ export function OverviewPage({
               <circle cx="553" cy="66" r="5" className="chart-point" />
             </svg>
             <div className="chart-x-labels">
-              <span>{t('Sep 21')}</span><span>{t('Sep 26')}</span><span>{t('Oct 01')}</span><span>{t('Oct 06')}</span><span>{t('Oct 11')}</span><span>{t('Oct 16')}</span><span>{t('Oct 20')}</span>
+              <span>{'Sep 21'}</span><span>{'Sep 26'}</span><span>{'Oct 01'}</span><span>{'Oct 06'}</span><span>{'Oct 11'}</span><span>{'Oct 16'}</span><span>{'Oct 20'}</span>
             </div>
           </div>
           <div className="chart-legend">
-            <span><i className="legend-dot purple-dot" /> {t('Shifts posted')}</span>
-            <span><i className="legend-dot blue-dot" /> {t('Workers onboarded')}</span>
-            <button className="text-action" onClick={() => onOpenSection('shifts')}>{t('View shift analytics')} <ArrowRight size={14} /></button>
+            <span><i className="legend-dot purple-dot" /> {'Shifts posted'}</span>
+            <span><i className="legend-dot blue-dot" /> {'Workers onboarded'}</span>
+            <button className="text-action" onClick={() => onOpenSection('shifts')}>{'View shift analytics'} <ArrowRight size={14} /></button>
           </div>
         </article>
 
         <article className="panel approvals-panel">
           <div className="panel-heading">
             <div>
-              <h2>{t('Needs your attention')}</h2>
-              <p>{t('Keep the marketplace moving')}</p>
+              <h2>{'Needs your attention'}</h2>
+              <p>{'Keep the marketplace moving'}</p>
             </div>
             <span className="attention-count">{pendingApprovals}</span>
           </div>
           <button className="attention-item" onClick={() => onOpenSection('approvals')}>
             <span className="attention-icon warning-icon"><Clock3 size={17} /></span>
-            <span className="attention-copy"><strong>{t('Verification requests')}</strong><small>{t('{{count}} waiting for review', { count: pendingApprovals })}</small></span>
+            <span className="attention-copy"><strong>{'Verification requests'}</strong><small>{formatText('{{count}} waiting for review', { count: pendingApprovals })}</small></span>
             <ArrowRight size={16} />
           </button>
           <button className="attention-item" onClick={() => onOpenSection('payouts')}>
             <span className="attention-icon purple-icon"><ArrowDownLeft size={17} /></span>
-            <span className="attention-copy"><strong>{t('Payouts in progress')}</strong><small>{t('{{count}} awaiting completion', { count: payoutsInProgress })}</small></span>
+            <span className="attention-copy"><strong>{'Payouts in progress'}</strong><small>{formatText('{{count}} awaiting completion', { count: payoutsInProgress })}</small></span>
             <ArrowRight size={16} />
           </button>
           <button className="attention-item" onClick={() => onOpenSection('shifts')}>
             <span className="attention-icon blue-icon"><BriefcaseBusiness size={17} /></span>
-            <span className="attention-copy"><strong>{t('Shifts needing workers')}</strong><small>{t('{{count}} shifts are not fully staffed', { count: shiftsNeedingWorkers })}</small></span>
+            <span className="attention-copy"><strong>{'Shifts needing workers'}</strong><small>{formatText('{{count}} shifts are not fully staffed', { count: shiftsNeedingWorkers })}</small></span>
             <ArrowRight size={16} />
           </button>
           <button className="attention-item" onClick={() => onOpenSection('support')}>
             <span className="attention-icon orange-icon"><CircleHelp size={17} /></span>
-            <span className="attention-copy"><strong>{t('Support tickets')}</strong><small>{t('{{count}} unresolved tickets', { count: openTickets })}</small></span>
+            <span className="attention-copy"><strong>{'Support tickets'}</strong><small>{formatText('{{count}} unresolved tickets', { count: openTickets })}</small></span>
             <ArrowRight size={16} />
           </button>
           <div className="attention-footer">
-            <span>{t('Updated just now')}</span>
-            <button className="text-action" onClick={() => onOpenSection('support')}>{t('Open support')} <ArrowRight size={14} /></button>
+            <span>{'Updated just now'}</span>
+            <button className="text-action" onClick={() => onOpenSection('support')}>{'Open support'} <ArrowRight size={14} /></button>
           </div>
         </article>
       </section>
@@ -189,50 +191,65 @@ export function OverviewPage({
         <article className="panel table-panel">
           <div className="panel-heading">
             <div>
-              <h2>{t('Recent workers')}</h2>
-              <p>{t('Latest people to join your network')}</p>
+              <h2>{'Worker profiles'}</h2>
+              <p>{'Profiles loaded from the live worker API'}</p>
             </div>
-            <button className="text-action" onClick={() => onOpenSection('workers')}>{t('View all')} <ArrowRight size={14} /></button>
+            <button className="text-action" onClick={() => onOpenSection('workers')}>{'View all'} <ArrowRight size={14} /></button>
           </div>
           <div className="compact-list">
             {workers.slice(0, 4).map((worker, index) => (
               <div className="compact-row" key={worker.id}>
-                <span className={`user-avatar avatar-${index % 5}`}>{worker.name.split(' ').map(part => part[0]).join('')}</span>
-          <span className="compact-primary"><strong>{worker.name}</strong><small>{t(worker.workTypes[0] ?? '')} · {t(worker.area)}</small></span>
-                <span className="compact-rating">★ {worker.rating.toFixed(1)}</span>
-                <StatusBadge tone={worker.status === 'active' ? 'success' : worker.status === 'pending' ? 'warning' : 'danger'}>{worker.status}</StatusBadge>
+                <ProfileAvatar
+                  className={`user-avatar avatar-${index % 5}`}
+                  imageUrl={worker.photoUrl}
+                  name={worker.name}
+                />
+                <span className="compact-primary"><strong>{worker.name}</strong><small>{worker.categories[0] ?? 'No category'} · {worker.locality || worker.address}</small></span>
+                <span className="compact-rating">{worker.ratingCount ? `★ ${worker.rating.toFixed(1)}` : '—'}</span>
+                <div className="compact-worker-status">
+                  <StatusBadge tone={worker.isActive ? 'success' : 'danger'}>
+                    {worker.isActive ? 'Active' : 'Suspended'}
+                  </StatusBadge>
+                  <StatusBadge tone={worker.verificationStatus === 'verified' ? 'success' : worker.verificationStatus === 'pending' ? 'warning' : 'danger'}>
+                    {worker.verificationStatus}
+                  </StatusBadge>
+                  <StatusBadge tone={worker.isAvailable ? 'blue' : 'neutral'}>
+                    {worker.isAvailable ? 'Online' : 'Offline'}
+                  </StatusBadge>
+                </div>
               </div>
             ))}
+            {workers.length === 0 ? <p className="empty-state">No worker profiles found.</p> : null}
           </div>
         </article>
 
         <article className="panel activity-panel">
           <div className="panel-heading">
             <div>
-              <h2>{t('Recent activity')}</h2>
-              <p>{t('Live updates from your marketplace')}</p>
+              <h2>{'Recent activity'}</h2>
+              <p>{'Live updates from your marketplace'}</p>
             </div>
-            <button className="icon-button" aria-label={t('More activity options')}><MoreHorizontal size={19} /></button>
+            <button className="icon-button" aria-label={'More activity options'}><MoreHorizontal size={19} /></button>
           </div>
           <div className="activity-list">
             {activityItems.map(item => (
               <div className="activity-item" key={item.text}>
                 <span className={`activity-avatar activity-${item.tone}`}>{item.initials}</span>
-                <span className="activity-copy"><strong>{t(item.text)}</strong><small>{t(item.detail)}</small></span>
+                <span className="activity-copy"><strong>{item.text}</strong><small>{item.detail}</small></span>
               </div>
             ))}
           </div>
-          <button className="activity-link">{t('See all activity')} <ArrowRight size={14} /></button>
+          <button className="activity-link">{'See all activity'} <ArrowRight size={14} /></button>
         </article>
       </section>
 
       <section className="panel payments-strip">
         <div className="panel-heading">
           <div>
-              <h2>{t('Latest transactions')}</h2>
-              <p>{t('Recent payment activity across the platform')}</p>
+              <h2>{'Latest transactions'}</h2>
+              <p>{'Recent payment activity across the platform'}</p>
           </div>
-          <button className="button button-secondary compact-button" onClick={() => onOpenSection('payments')}>{t('All payments')} <ArrowRight size={15} /></button>
+          <button className="button button-secondary compact-button" onClick={() => onOpenSection('payments')}>{'All payments'} <ArrowRight size={15} /></button>
         </div>
         <div className="payment-summary-row">
           {payments.slice(0, 3).map(payment => (

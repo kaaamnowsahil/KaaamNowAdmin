@@ -4,18 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "dev": "vite --mode dev",
+    "dev:prod": "vite --mode prod",
+    "build": "tsc -b && vite build --mode prod",
+    "build:dev": "tsc -b && vite build --mode dev",
+    "preview": "vite preview --mode prod",
     "typecheck": "tsc -b"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.3.0",
-    "i18next": "^26.5.3",
     "lucide-react": "^1.60.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-i18next": "^17.1.0",
     "react-router-dom": "^7.18.4",
     "zod": "^4.6.7",
     "zustand": "^5.0.15"

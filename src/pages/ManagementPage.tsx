@@ -1,3 +1,4 @@
+import { formatText } from '@/utils/text';
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -11,9 +12,10 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { StatusBadge } from '@/components/StatusBadge';
+import { ProfileAvatar } from '@/components/ProfileAvatar';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ManagementMetrics, type ManagementMetric } from '@/components/ManagementMetrics';
 import type {
   AdminShift,
@@ -22,12 +24,11 @@ import type {
   Payout,
   PayoutStatus,
   SupportTicket,
-  VerificationRequest,
+  AdminVerificationRequest,
   Worker,
 } from '@/types';
 import { downloadCsv } from '@/utils/csv';
 import { formatRupees, initialsOf } from '@/utils/format';
-import { translateText } from '@/i18n';
 
 export type AdminSection =
   | 'workers'
@@ -44,45 +45,59 @@ export type SelectedRecord = {
   subtitle: string;
   details: DetailItem[];
   type: 'worker' | 'business' | 'record';
+  userId?: string;
+  accountIsActive?: boolean;
+  imageUrl?: string | null;
 };
 
 type ManagementPageProps = {
   section: AdminSection;
-  workers: Worker[];
+  workers?: Worker[];
   businesses: Business[];
   shifts: AdminShift[];
   payments: Payment[];
   payouts: Payout[];
   supportTickets: SupportTicket[];
-  approvals: VerificationRequest[];
+  approvals: AdminVerificationRequest[];
   search: string;
   onSearch: (value: string) => void;
   onSelect: (record: SelectedRecord) => void;
-  onReviewApproval: (id: string, action: 'approved' | 'rejected') => void;
   onUpdatePayout?: (payoutId: string, status: PayoutStatus) => void;
   onResolveTicket?: (ticketId: string) => void;
+  onVerifyProfile?: (
+    type: 'worker' | 'business',
+    profileId: string,
+    status: 'verified' | 'rejected',
+  ) => void;
+  busyDirectoryId?: string;
+  busyVerificationDecision?: 'verified' | 'rejected' | '';
 };
 
 type Row = {
   id: string;
+  userId?: string;
+  accountIsActive?: boolean;
   title: string;
   subtitle: string;
   avatar: string;
   avatarTone: number;
+  imageUrl?: string | null;
   cells: string[];
   status: string;
   statusTone: 'success' | 'warning' | 'danger' | 'neutral' | 'purple' | 'blue';
+  secondaryStatuses?: { label: string; tone: Row['statusTone'] }[];
+  verificationType?: 'worker' | 'business';
   details: DetailItem[];
   detailType: SelectedRecord['type'];
 };
 
 const sectionMeta: Record<AdminSection, { title: string; description: string; label: string; action: string; columns: string[] }> = {
-  workers: { title: 'Workers', description: 'Review worker accounts, activity and payout readiness.', label: 'ALL WORKERS', action: 'Export workers', columns: ['Worker', 'Work category', 'Location', 'Rating', 'Completed shifts', 'Status'] },
-  businesses: { title: 'Businesses', description: 'Manage business accounts, verification and marketplace activity.', label: 'ALL BUSINESSES', action: 'Export businesses', columns: ['Business', 'Type', 'Location', 'Shifts posted', 'Total spend', 'Status'] },
+  workers: { title: 'Workers', description: 'Manage worker profiles, verification and availability.', label: 'ALL WORKERS', action: 'Export workers', columns: ['Worker', 'Work category', 'Location', 'Rating', 'Completed shifts', 'Status'] },
+  businesses: { title: 'Businesses', description: 'Manage business profiles, verification and marketplace activity.', label: 'ALL BUSINESSES', action: 'Export businesses', columns: ['Business', 'Business type', 'Location', 'Rating', 'Reviews', 'Status'] },
   shifts: { title: 'Shifts', description: 'Monitor live requests and scheduled work across the city.', label: 'ALL SHIFTS', action: 'Export shifts', columns: ['Shift', 'Business', 'Schedule', 'Workers', 'Pay rate', 'Status'] },
   payments: { title: 'Payments', description: 'Track business charges, platform fees and transaction status.', label: 'TRANSACTION LEDGER', action: 'Export ledger', columns: ['Transaction', 'Business', 'Date', 'Method', 'Amount', 'Status'] },
   payouts: { title: 'Payouts', description: 'Review worker withdrawals and payout completion across channels.', label: 'PAYOUT QUEUE', action: 'Export payouts', columns: ['Worker', 'Method', 'Requested', 'Amount', 'Status'] },
-  approvals: { title: 'Approvals', description: 'Verify workers and businesses before they access the marketplace.', label: 'REVIEW QUEUE', action: 'Export queue', columns: ['Request', 'Applicant', 'Submitted', 'Documents', 'Status'] },
+  approvals: { title: 'Approvals', description: 'Review and verify pending worker and business profiles.', label: 'REVIEW QUEUE', action: 'Export queue', columns: ['Applicant', 'Profile type', 'Phone', 'Location', 'Status'] },
   support: { title: 'Support', description: 'Track critical issues raised by workers and businesses across the platform.', label: 'SUPPORT TICKETS', action: 'Export tickets', columns: ['Subject', 'Raised by', 'Category', 'Priority', 'Status'] },
 };
 
@@ -105,7 +120,7 @@ const matchesStatus = (value: string, ...allowed: string[]) =>
 
 export function ManagementPage({
   section,
-  workers,
+  workers = [],
   businesses,
   shifts,
   payments,
@@ -115,12 +130,13 @@ export function ManagementPage({
   search,
   onSearch,
   onSelect,
-  onReviewApproval,
   onUpdatePayout,
   onResolveTicket,
+  onVerifyProfile,
+  busyDirectoryId,
+  busyVerificationDecision,
 }: ManagementPageProps) {
-  const { t, i18n } = useTranslation();
-  const locale = i18n.resolvedLanguage === 'hi' ? 'hi-IN' : i18n.resolvedLanguage === 'kn' ? 'kn-IN' : 'en-IN';
+  const locale = 'en-IN';
   const meta = sectionMeta[section];
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [attributeFilter, setAttributeFilter] = useState('All categories');
@@ -147,7 +163,7 @@ export function ManagementPage({
     const query = search.trim().toLowerCase();
     const matchesSearch =
       !query ||
-      [row.id, row.title, row.subtitle, row.status, ...row.cells, ...[row.status, ...row.cells].map(translateText)]
+      [row.id, row.title, row.subtitle, row.status, ...row.cells]
         .join(' ')
         .toLowerCase()
         .includes(query);
@@ -170,36 +186,48 @@ export function ManagementPage({
   const exportRows = (rowsToExport: Row[]) => {
     downloadCsv(
       `kaaamnow-${section}`,
-      [...meta.columns.map(column => t(column)), t('Record ID')],
-      rowsToExport.map(row => [translateText(row.title), ...row.cells.map(translateText), translateText(row.status), row.id]),
+      [...meta.columns.map(column => column), 'Record ID'],
+      rowsToExport.map(row => [row.title, ...row.cells, row.status, row.id]),
     );
   };
 
   const metrics = getSectionMetrics(section, rows);
+  const isDirectory = section === 'workers' || section === 'businesses';
+  const selectRow = (row: Row) => {
+    onSelect({
+      title: row.title,
+      subtitle: row.id,
+      details: row.details,
+      type: row.detailType,
+      userId: row.userId,
+      accountIsActive: row.accountIsActive,
+      imageUrl: row.imageUrl,
+    });
+  };
 
   return (
     <div className="page-stack">
       <section className="page-title-row">
         <div>
           <div className="eyebrow-row">
-            <span className="eyebrow">{t(meta.label)}</span>
+            <span className="eyebrow">{meta.label}</span>
             <span className="title-divider">/</span>
-            <span className="eyebrow-sub">{t('Bengaluru marketplace')}</span>
+            <span className="eyebrow-sub">{'Bengaluru marketplace'}</span>
           </div>
-          <h1>{t(meta.title)}</h1>
-          <p className="page-description">{t(meta.description)}</p>
+          <h1>{meta.title}</h1>
+          <p className="page-description">{meta.description}</p>
         </div>
         <button className="button button-secondary" onClick={() => exportRows(rows)}>
           <ArrowDownToLine size={16} />
-          {t(meta.action)}
+          {meta.action}
         </button>
       </section>
 
       {section === 'approvals' ? (
         <div className="approval-summary">
           <div className="approval-summary-icon"><ShieldCheck size={20} /></div>
-          <div><strong>{t('{{count}} requests need review', { count: pendingApprovals.length })}</strong><span>{t('Review submitted documents to keep the marketplace safe.')}</span></div>
-          <span className="approval-sla"><Clock3 size={14} /> {t('Average review time: {{hours}} hrs', { hours: 2.4 })}</span>
+          <div><strong>{formatText('{{count}} profiles need review', { count: pendingApprovals.length })}</strong><span>{'Review profile details and verification status.'}</span></div>
+          <span className="approval-sla"><Clock3 size={14} /> {formatText('Average review time: {{hours}} hrs', { hours: 2.4 })}</span>
         </div>
       ) : (
         <ManagementMetrics metrics={metrics} />
@@ -208,108 +236,158 @@ export function ManagementPage({
       <section className="panel data-panel">
         <div className="data-toolbar">
           <div className="data-heading">
-            <h2>{section === 'approvals' ? t('Requests to review') : t(meta.title)}</h2>
+            <h2>{section === 'approvals' ? 'Requests to review' : meta.title}</h2>
             <span className="data-count">{matchingRows.length}</span>
           </div>
           <div className="table-actions">
             <label className="table-search">
               <Search size={16} />
               <input
-                aria-label={t('Search {{section}}', { section: t(meta.title).toLowerCase() })}
-                placeholder={t('Search {{section}}...', { section: t(meta.title).toLowerCase() })}
+                aria-label={formatText('Search {{section}}', { section: meta.title.toLowerCase() })}
+                placeholder={formatText('Search {{section}}...', { section: meta.title.toLowerCase() })}
                 value={search}
                 onChange={event => onSearch(event.target.value)}
               />
             </label>
             <label className="filter-select">
-              <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t('Filter by status')}>
-                <option value="All statuses">{t('All statuses')}</option>
-                {[...new Set(rows.map(row => row.status))].map(status => <option key={status} value={status}>{translateText(status)}</option>)}
+              <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'Filter by status'}>
+                <option value="All statuses">{'All statuses'}</option>
+                {[...new Set(rows.map(row => row.status))].map(status => <option key={status} value={status}>{status}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
             <label className="filter-select">
-              <select value={attributeFilter} onChange={event => setAttributeFilter(event.target.value)} aria-label={t('Filter by category or field')}>
-                <option value="All categories">{t('All categories')}</option>
-                {filterOptions.map(value => <option key={value} value={value}>{translateText(value)}</option>)}
+              <select value={attributeFilter} onChange={event => setAttributeFilter(event.target.value)} aria-label={'Filter by category or field'}>
+                <option value="All categories">{'All categories'}</option>
+                {filterOptions.map(value => <option key={value} value={value}>{value}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
-            <button className="button button-secondary table-export" onClick={() => exportRows(matchingRows)}><ArrowDownToLine size={15} /> {t('Export')}</button>
+            <button className="button button-secondary table-export" onClick={() => exportRows(matchingRows)}><ArrowDownToLine size={15} /> {'Export'}</button>
           </div>
         </div>
         <div className="table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
-                {meta.columns.map(column => <th key={column}>{t(column)}</th>)}
-                <th><span className="sr-only">{t('Actions')}</span></th>
+                {meta.columns.map((column, index) => (
+                  <th
+                    key={column}
+                    className={isDirectory && index === meta.columns.length - 1 ? 'directory-status-heading' : undefined}
+                  >
+                    {column}
+                  </th>
+                ))}
+                {!isDirectory ? <th><span className="sr-only">{'Actions'}</span></th> : null}
               </tr>
             </thead>
             <tbody>
               {matchingRows.map(row => (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  className={isDirectory ? 'clickable-row' : undefined}
+                  tabIndex={isDirectory ? 0 : undefined}
+                  aria-label={isDirectory ? formatText('View {{name}} details', { name: row.title }) : undefined}
+                  onClick={isDirectory ? () => selectRow(row) : undefined}
+                  onKeyDown={isDirectory ? event => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      selectRow(row);
+                    }
+                  } : undefined}
+                >
                   <td>
-                    <button className="identity-cell" onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}>
-                      <span className={`user-avatar avatar-${row.avatarTone}`}>{row.avatar}</span>
-                      <span><strong>{translateText(row.title)}</strong><small>{row.id} · {translateText(row.subtitle)}</small></span>
-                    </button>
+                    <div className="identity-cell">
+                      <ProfileAvatar
+                        className={`user-avatar avatar-${row.avatarTone}`}
+                        imageUrl={row.imageUrl}
+                        name={row.title}
+                      />
+                      <span><strong>{row.title}</strong><small>{row.id} · {row.subtitle}</small></span>
+                    </div>
                   </td>
                   {row.cells.map((cell, index) => (
-                    <td key={`${row.id}-${index}`} className={index === 0 ? 'table-primary-cell' : ''}>{translateText(cell)}</td>
+                    <td key={`${row.id}-${index}`} className={index === 0 ? 'table-primary-cell' : ''}>
+                      {(section === 'workers' || section === 'businesses') && index === 0 ? (
+                        <span
+                          className="category-summary"
+                          title={
+                            row.details.find(item =>
+                              item.label === 'Work categories' || item.label === 'Business types',
+                            )?.value ?? cell
+                          }
+                        >
+                          {cell}
+                        </span>
+                      ) : cell}
+                    </td>
                   ))}
-                  <td>
-                    <StatusBadge tone={row.statusTone}>{row.status}</StatusBadge>
+                  <td className={isDirectory ? 'directory-status-cell' : undefined}>
+                    <div className="directory-statuses">
+                      <StatusBadge tone={row.statusTone}>{row.status}</StatusBadge>
+                      {row.secondaryStatuses?.map(status => (
+                        <StatusBadge key={status.label} tone={status.tone}>{status.label}</StatusBadge>
+                      ))}
+                    </div>
                   </td>
-                  <td>
+                  {!isDirectory ? <td>
                     {section === 'approvals' && matchesStatus(row.status, 'pending') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={t('Approve {{name}}', { name: row.title })} onClick={() => onReviewApproval(row.id, 'approved')}><Check size={15} /></button>
-                        <button className="approval-action reject-action" aria-label={t('Reject {{name}}', { name: row.title })} onClick={() => onReviewApproval(row.id, 'rejected')}><X size={15} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, imageUrl: row.imageUrl })}><Eye size={16} /></button>
+                        {onVerifyProfile && row.verificationType ? (
+                          <>
+                            <button className="approval-action approve-action" disabled={busyDirectoryId === row.id} aria-label={formatText('Verify {{name}}', { name: row.title })} onClick={() => row.verificationType && onVerifyProfile(row.verificationType, row.id, 'verified')}>
+                              {busyDirectoryId === row.id && busyVerificationDecision === 'verified' ? <LoadingIndicator label="Verifying…" className="loading-indicator-compact" /> : <Check size={15} />}
+                            </button>
+                            <button className="approval-action reject-action" disabled={busyDirectoryId === row.id} aria-label={formatText('Reject {{name}}', { name: row.title })} onClick={() => row.verificationType && onVerifyProfile(row.verificationType, row.id, 'rejected')}>
+                              {busyDirectoryId === row.id && busyVerificationDecision === 'rejected' ? <LoadingIndicator label="Rejecting…" className="loading-indicator-compact" /> : <X size={15} />}
+                            </button>
+                          </>
+                        ) : null}
                       </div>
                     ) : section === 'support' && onResolveTicket && !matchesStatus(row.status, 'resolved') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={t('Resolve {{name}}', { name: row.title })} onClick={() => onResolveTicket(row.id)}><Check size={15} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, imageUrl: row.imageUrl })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={formatText('Resolve {{name}}', { name: row.title })} onClick={() => onResolveTicket(row.id)}><Check size={15} /></button>
                       </div>
                     ) : section === 'payouts' && onUpdatePayout && matchesStatus(row.status, 'pending') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={t('Start processing payout for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'processing')}><ArrowRight size={15} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={formatText('Start processing payout for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'processing')}><ArrowRight size={15} /></button>
                       </div>
                     ) : section === 'payouts' && onUpdatePayout && matchesStatus(row.status, 'processing') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={t('Mark payout completed for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'completed')}><Check size={15} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
+                        <button className="approval-action approve-action" aria-label={formatText('Mark payout completed for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'completed')}><Check size={15} /></button>
                       </div>
                     ) : (
                       <div className="last-cell-actions">
-                        <button className="icon-button row-view" aria-label={t('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><MoreHorizontal size={17} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><MoreHorizontal size={17} /></button>
                       </div>
                     )}
-                  </td>
+                  </td> : null}
                 </tr>
               ))}
               {matchingRows.length === 0 ? (
-                <tr><td colSpan={meta.columns.length + 1}><div className="empty-table"><Search size={22} /><strong>{t('No matching records')}</strong><span>{t('Try another search or clear the selected status filter.')}</span></div></td></tr>
+                <tr><td colSpan={meta.columns.length + (isDirectory ? 0 : 1)}><div className="empty-table"><Search size={22} /><strong>{'No matching records'}</strong><span>{'Try another search or clear the selected status filter.'}</span></div></td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
         <div className="table-pagination">
-          <span>{t('Showing {{start}}–{{end}} of {{total}} results', { start: matchingRows.length ? 1 : 0, end: matchingRows.length, total: matchingRows.length })}</span>
-          <div><button disabled>{t('Previous')}</button><button className="page-current">1</button><button disabled>{t('Next')}</button></div>
+          <span>{formatText('Showing {{start}}–{{end}} of {{total}} results', { start: matchingRows.length ? 1 : 0, end: matchingRows.length, total: matchingRows.length })}</span>
+          <div><button disabled>{'Previous'}</button><button className="page-current">1</button><button disabled>{'Next'}</button></div>
         </div>
       </section>
-      <div className="table-footnote"><span>{t('Data refreshes automatically')}</span><span>{t('Last updated a few seconds ago')} <ArrowRight size={13} /></span></div>
+      <div className="table-footnote"><span>{'Data refreshes automatically'}</span><span>{'Last updated a few seconds ago'} <ArrowRight size={13} /></span></div>
 
       {section === 'approvals' && pendingApprovals.length === 0 ? (
-        <div className="all-reviewed"><Check size={16} /> {t('All verification requests have been reviewed.')}</div>
+        <div className="all-reviewed"><Check size={16} /> {'All verification requests have been reviewed.'}</div>
       ) : null}
 
       {section === 'support' && supportTickets.filter(ticket => ticket.status !== 'resolved').length === 0 ? (
-        <div className="all-reviewed"><Check size={16} /> {t('All support tickets have been resolved.')}</div>
+        <div className="all-reviewed"><Check size={16} /> {'All support tickets have been resolved.'}</div>
       ) : null}
     </div>
   );
@@ -318,21 +396,25 @@ export function ManagementPage({
 function getSectionMetrics(section: AdminSection, rows: Row[]): ManagementMetric[] {
   const count = (...statuses: string[]) =>
     rows.filter(row => matchesStatus(row.status, ...statuses)).length;
+  const countSecondary = (status: string) =>
+    rows.filter(row =>
+      row.secondaryStatuses?.some(item => matchesStatus(item.label, status)),
+    ).length;
 
   switch (section) {
     case 'workers':
       return [
         { label: 'Total workers', value: String(rows.length), attention: false },
-        { label: 'Active accounts', value: String(count('active')), attention: false },
-        { label: 'KYC pending', value: String(count('pending')), attention: true },
-        { label: 'Blocked accounts', value: String(count('blocked')), attention: false },
+        { label: 'Active accounts', value: String(countSecondary('active')), attention: false },
+        { label: 'Verification pending', value: String(count('pending')), attention: true },
+        { label: 'Suspended accounts', value: String(countSecondary('suspended')), attention: false },
       ];
     case 'businesses':
       return [
         { label: 'Total businesses', value: String(rows.length), attention: false },
         { label: 'Verified', value: String(count('verified')), attention: false },
-        { label: 'Under review', value: String(count('under review')), attention: true },
-        { label: 'Blocked', value: String(count('blocked')), attention: false },
+        { label: 'Pending', value: String(count('pending')), attention: true },
+        { label: 'Suspended', value: String(countSecondary('suspended')), attention: false },
       ];
     case 'shifts':
       return [
@@ -375,30 +457,51 @@ function getRows(
   payments: Payment[],
   payouts: Payout[],
   supportTickets: SupportTicket[],
-  approvals: VerificationRequest[],
+  approvals: AdminVerificationRequest[],
   locale: string,
 ): Row[] {
   if (section === 'workers') {
     return workers.map((worker, index) => ({
       id: worker.id,
+      userId: worker.userId,
+      accountIsActive: worker.isActive,
+      imageUrl: worker.photoUrl,
       title: worker.name,
       subtitle: worker.phone.replace(/(\+91)\d{5}(\d{5})/, '$1 ••••• $2'),
       avatar: initialsOf(worker.name),
       avatarTone: index % 5,
-      cells: [worker.workTypes.map(titleCase).join(', '), `${worker.area}, ${worker.city}`, `★ ${worker.rating.toFixed(1)}`, String(worker.completedShifts)],
-      status: titleCase(worker.status),
-      statusTone: statusTone(worker.status),
+      cells: [
+        categorySummary(worker.categories),
+        worker.locality || worker.address,
+        worker.ratingCount ? `★ ${worker.rating.toFixed(1)}` : '—',
+        String(worker.completedShifts),
+      ],
+      status: titleCase(worker.verificationStatus),
+      statusTone: statusTone(worker.verificationStatus),
+      secondaryStatuses: [
+        {
+          label: worker.isActive ? 'Active' : 'Suspended',
+          tone: worker.isActive ? 'success' : 'danger',
+        },
+        {
+          label: worker.isAvailable ? 'Online' : 'Offline',
+          tone: worker.isAvailable ? 'blue' : 'neutral',
+        },
+      ],
       detailType: 'worker',
       details: [
         { label: 'Phone', value: worker.phone },
         { label: 'Email', value: worker.email ?? 'Not provided' },
-        { label: 'Location', value: `${worker.area}, ${worker.city}` },
-        { label: 'Work categories', value: worker.workTypes.map(titleCase).join(', ') },
-        { label: 'KYC status', value: titleCase(worker.kycStatus) },
+        { label: 'Age', value: worker.age === null ? 'Not provided' : String(worker.age) },
+        { label: 'Address', value: worker.address },
+        { label: 'Work categories', value: worker.categories.map(titleCase).join(', ') || 'Not provided' },
+        { label: 'Verification status', value: titleCase(worker.verificationStatus) },
+        { label: 'Account status', value: worker.isActive ? 'Active' : 'Suspended' },
+        { label: 'Availability', value: worker.isAvailable ? 'Available' : 'Unavailable' },
+        { label: 'Rating count', value: String(worker.ratingCount) },
         { label: 'Completed shifts', value: String(worker.completedShifts) },
-        { label: 'Total earnings', value: formatRupees(worker.totalEarnings) },
-        { label: 'Payout account', value: worker.payout.destination },
-        { label: 'Joined', value: dateLabel(worker.joinedAt, locale) },
+        { label: 'Verification note', value: worker.verificationNote ?? 'None' },
+        { label: 'Verified at', value: worker.verifiedAt ? dateLabel(worker.verifiedAt, locale) : 'Not verified' },
       ],
     }));
   }
@@ -406,24 +509,39 @@ function getRows(
   if (section === 'businesses') {
     return businesses.map((business, index) => ({
       id: business.id,
+      userId: business.userId,
+      accountIsActive: business.isActive,
+      imageUrl: business.logoUrl,
       title: business.name,
-      subtitle: business.contactName,
+      subtitle: business.phone,
       avatar: initialsOf(business.name),
       avatarTone: index % 5,
-      cells: [titleCase(business.businessType), `${business.area}, ${business.city}`, String(business.shiftsPosted), formatRupees(business.totalSpend)],
-      status: business.isVerified ? 'Verified' : titleCase(business.status === 'pending' ? 'Under review' : business.status),
-      statusTone: business.isVerified ? 'success' : statusTone(business.status),
+      cells: [
+        categorySummary(business.businessTypes),
+        business.locality || business.address,
+        business.ratingCount ? `★ ${business.rating.toFixed(1)}` : '—',
+        String(business.ratingCount),
+      ],
+      status: titleCase(business.verificationStatus),
+      statusTone: statusTone(business.verificationStatus),
+      secondaryStatuses: [{
+        label: business.isActive ? 'Active' : 'Suspended',
+        tone: business.isActive ? 'success' : 'danger',
+      }],
       detailType: 'business',
       details: [
+        { label: 'Owner', value: business.ownerName },
         { label: 'Primary contact', value: business.contactName },
         { label: 'Phone', value: business.phone },
         { label: 'Email', value: business.email ?? 'Not provided' },
-        { label: 'Business category', value: titleCase(business.businessType) },
+        { label: 'Business category', value: business.category ? titleCase(business.category) : 'Not provided' },
+        { label: 'Business types', value: business.businessTypes.map(titleCase).join(', ') || 'Not provided' },
         { label: 'Address', value: business.address },
-        { label: 'GSTIN', value: business.gstin ?? 'Not provided' },
-        { label: 'Shifts posted', value: String(business.shiftsPosted) },
-        { label: 'Total spend', value: formatRupees(business.totalSpend) },
-        { label: 'Outstanding', value: formatRupees(business.outstanding) },
+        { label: 'Verification status', value: titleCase(business.verificationStatus) },
+        { label: 'Account status', value: business.isActive ? 'Active' : 'Suspended' },
+        { label: 'Verification note', value: business.verificationNote ?? 'None' },
+        { label: 'Verified at', value: business.verifiedAt ? dateLabel(business.verifiedAt, locale) : 'Not verified' },
+        { label: 'Rating', value: business.ratingCount ? `${business.rating.toFixed(1)} (${business.ratingCount} reviews)` : 'No reviews' },
       ],
     }));
   }
@@ -527,25 +645,20 @@ function getRows(
   return approvals.map((approval, index) => ({
     id: approval.id,
     title: approval.name,
-    subtitle: `${titleCase(approval.subject)} · ${approval.phone}`,
+    subtitle: approval.phone,
     avatar: initialsOf(approval.name),
     avatarTone: index % 5,
     cells: [
-      `${titleCase(approval.subject)} · ${approval.phone}`,
-      new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(approval.submittedAt)),
-      `${approval.documents.length} documents`,
+      titleCase(approval.subject),
+      approval.phone,
+      approval.area,
     ],
     status: titleCase(approval.status),
     statusTone: statusTone(approval.status),
-    detailType: 'record',
-    details: [
-      { label: 'Applicant type', value: titleCase(approval.subject) },
-      { label: 'Phone', value: approval.phone },
-      { label: 'Location', value: approval.area },
-      { label: 'Submitted', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(approval.submittedAt)) },
-      ...approval.documents.map(document => ({ label: titleCase(document.type), value: document.number })),
-      { label: 'Review status', value: titleCase(approval.status) },
-    ],
+    imageUrl: approval.imageUrl,
+    detailType: approval.subject,
+    verificationType: approval.subject,
+    details: approval.details,
   }));
 }
 
@@ -554,4 +667,11 @@ function titleCase(value: string) {
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]/g, ' ')
     .replace(/\b\w/g, character => character.toUpperCase());
+}
+
+function categorySummary(categories: string[]) {
+  const names = categories.map(titleCase);
+  return names.length > 3
+    ? `${names.slice(0, 3).join(', ')}, …`
+    : names.join(', ');
 }

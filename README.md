@@ -10,16 +10,16 @@ Admin console for the KaaamNow shift-work marketplace. Operations staff use it t
 - **Approvals** – approve or reject worker/business verification (KYC) requests.
 - **Support** – track and resolve tickets raised by workers and businesses.
 - **Detail pages** – dedicated views for workers, businesses and other marketplace records.
-- **Localization** – English, Hindi and Kannada, with a language switcher (choice saved in `localStorage`).
-- Responsive layout with a collapsible sidebar.
+- **Admin sign-in** – email/password authentication through the backend admin login endpoint.
+- **Account deletion** – server-backed request review, holds and audit history.
+- Desktop-only admin layout.
 
-The app currently runs on mock data from `src/data/mockData.ts`; there is no backend integration yet.
+Overview and marketplace management use sample data from `src/data/mockData.ts`. Admin sign-in and account-deletion requests use the backend API.
 
 ## Tech stack
 
 - React 19 + TypeScript
 - Vite
-- i18next / react-i18next
 - lucide-react icons
 - Montserrat font via `@fontsource/montserrat`
 
@@ -32,14 +32,18 @@ npm install
 npm run dev
 ```
 
+`npm run dev` uses `.env.dev` and the local API at `http://localhost:8000`. Use `npm run dev:prod` to run the UI against the production API. Admin credentials are verified by the backend and are not stored in the frontend environment files.
+
 ## Scripts
 
-| Command             | Description                          |
-| ------------------- | ------------------------------------ |
-| `npm run dev`       | Start the Vite dev server            |
-| `npm run build`     | Type-check and build to `dist/`      |
-| `npm run preview`   | Preview the production build locally |
-| `npm run typecheck` | Run the TypeScript compiler only     |
+| Command                | Description                                      |
+| ---------------------- | ------------------------------------------------ |
+| `npm run dev`          | Start Vite using `.env.dev`                      |
+| `npm run dev:prod`     | Start Vite using `.env.prod`                     |
+| `npm run build`        | Type-check and build using `.env.prod`           |
+| `npm run build:dev`    | Type-check and build using `.env.dev`            |
+| `npm run preview`      | Preview the production build locally             |
+| `npm run typecheck`    | Run the TypeScript compiler only                 |
 
 ## Project structure
 
@@ -48,11 +52,14 @@ src/
   components/   Shared UI (Sidebar, Topbar, MetricCard, StatusBadge, ...)
   constants/    Brand, colors, platform settings and route paths
   data/         Mock marketplace data
+  features/     Authentication and account-deletion workflows
+  hooks/        Dashboard state and actions
+  layouts/      Authenticated admin layout
   pages/        Overview, Management, Payouts, Support and detail pages
   types/        Domain types (worker, business, shift, payment, payout, ...)
   utils/        CSV export, date and number formatting helpers
-  i18n.ts       Translations (en, hi, kn) and i18next setup
-  App.tsx       App shell, navigation and state
+  api/          Backend auth, shared HTTP client and account-deletion APIs
+  App.tsx       Session-aware URL routing
 ```
 
 ## Branches

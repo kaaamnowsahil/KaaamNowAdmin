@@ -2,43 +2,32 @@ import {
   Activity,
   BadgeCheck,
   BriefcaseBusiness,
+  Boxes,
   Building2,
   ChevronDown,
   CircleHelp,
   LayoutDashboard,
+  ListChecks,
   LogOut,
-  Menu,
   Settings2,
+  ShieldAlert,
   UsersRound,
   Wallet,
-  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { BRAND } from '@/constants/brand';
-import { useTranslation } from 'react-i18next';
-
-export type Section =
-  | 'overview'
-  | 'workers'
-  | 'businesses'
-  | 'shifts'
-  | 'payments'
-  | 'payouts'
-  | 'approvals'
-  | 'support';
+import type { AdminSection } from '@/constants/routes';
 
 type SidebarProps = {
-  active: Section;
+  active: AdminSection;
   pendingApprovals: number;
-  mobileOpen: boolean;
-  onNavigate: (section: Section) => void;
-  onClose: () => void;
-  onToggle: () => void;
+  onNavigate: (section: AdminSection) => void;
+  onSignOut: () => void;
 };
 
 const navigation: {
-  id: Section;
+  id: AdminSection;
   label: string;
   icon: LucideIcon;
   badge?: boolean;
@@ -51,58 +40,34 @@ const navigation: {
   { id: 'payouts', label: 'Payouts', icon: Wallet },
   { id: 'approvals', label: 'Approvals', icon: BadgeCheck, badge: true },
   { id: 'support', label: 'Support', icon: CircleHelp },
+  { id: 'work-categories', label: 'Work categories', icon: ListChecks },
+  { id: 'business-types', label: 'Business / work types', icon: Boxes },
+  { id: 'account-deletion', label: 'Account deletion', icon: ShieldAlert },
 ];
 
 export function Sidebar({
   active,
   pendingApprovals,
-  mobileOpen,
   onNavigate,
-  onClose,
-  onToggle,
+  onSignOut,
 }: SidebarProps) {
-  const { t } = useTranslation();
   return (
-    <>
-      <button
-        className="mobile-menu-trigger"
-        aria-label={mobileOpen ? t('Close navigation') : t('Open navigation')}
-        onClick={onToggle}
-      >
-        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
-      {mobileOpen ? (
-        <button
-          className="sidebar-backdrop"
-          aria-label={t('Close navigation')}
-          onClick={onClose}
-        />
-      ) : null}
-      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
+      <aside className="sidebar">
         <div className="brand-lockup">
           <div className="brand-mark" aria-hidden="true">
             <span>K</span>
           </div>
           <div className="brand-copy">
             <strong>{BRAND.NAME}</strong>
-            <span>{t('ADMIN CONSOLE')}</span>
+            <span>{'ADMIN CONSOLE'}</span>
           </div>
-          <button className="sidebar-collapse" aria-label={t('Collapse sidebar')}>
+          <button className="sidebar-collapse" aria-label={'Collapse sidebar'}>
             <ChevronDown size={15} />
           </button>
         </div>
 
-        <div className="workspace-switcher">
-          <span className="workspace-avatar">K</span>
-          <span className="workspace-copy">
-            <strong>KaaamNow</strong>
-            <small>{t('Operations workspace')}</small>
-          </span>
-          <ChevronDown size={15} />
-        </div>
-
-        <nav className="primary-nav" aria-label={t('Main navigation')}>
-          <p className="nav-label">{t('WORKSPACE')}</p>
+        <nav className="primary-nav" aria-label={'Main navigation'}>
+          <p className="nav-label">{'WORKSPACE'}</p>
           {navigation.slice(0, 5).map(item => (
             <NavItem
               key={item.id}
@@ -110,12 +75,11 @@ export function Sidebar({
               active={active === item.id}
               onClick={() => {
                 onNavigate(item.id);
-                onClose();
               }}
             />
           ))}
 
-          <p className="nav-label nav-label-spaced">{t('MANAGEMENT')}</p>
+          <p className="nav-label nav-label-spaced">{'MANAGEMENT'}</p>
           {navigation.slice(5).map(item => (
             <NavItem
               key={item.id}
@@ -124,7 +88,6 @@ export function Sidebar({
               badge={pendingApprovals}
               onClick={() => {
                 onNavigate(item.id);
-                onClose();
               }}
             />
           ))}
@@ -133,27 +96,26 @@ export function Sidebar({
         <div className="sidebar-bottom">
           <button className="sidebar-link">
             <Activity size={17} />
-            <span>{t('Activity log')}</span>
+            <span>{'Activity log'}</span>
           </button>
           <button className="sidebar-link">
             <Settings2 size={17} />
-            <span>{t('Settings')}</span>
+            <span>{'Settings'}</span>
           </button>
           <button className="sidebar-link">
             <CircleHelp size={17} />
-            <span>{t('Help & support')}</span>
+            <span>{'Help & support'}</span>
           </button>
-          <div className="sidebar-user">
-            <div className="user-avatar admin-avatar">AS</div>
+          <button className="sidebar-user sidebar-signout" onClick={onSignOut}>
+            <div className="user-avatar admin-avatar">A</div>
             <div className="user-copy">
-              <strong>{t('Admin Sarah')}</strong>
-              <small>{t('Super admin')}</small>
+              <strong>{'Admin session'}</strong>
+              <small>{'Server verified'}</small>
             </div>
             <LogOut size={16} />
-          </div>
+          </button>
         </div>
       </aside>
-    </>
   );
 }
 
@@ -168,7 +130,6 @@ function NavItem({
   badge?: number;
   onClick: () => void;
 }) {
-  const { t } = useTranslation();
   const Icon = item.icon;
   return (
     <button
@@ -177,7 +138,7 @@ function NavItem({
       onClick={onClick}
     >
       <Icon size={18} strokeWidth={active ? 2.1 : 1.8} />
-      <span>{t(item.label)}</span>
+      <span>{item.label}</span>
       {item.badge && badge ? <b className="nav-badge">{badge}</b> : null}
     </button>
   );

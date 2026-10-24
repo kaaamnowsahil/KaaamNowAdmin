@@ -3,28 +3,24 @@ import type {
   Payment,
   Payout,
   SupportTicket,
-  VerificationRequest,
-  Worker,
+  AdminVerificationRequest,
 } from '@/types';
 
 import { ManagementPage, type SelectedRecord } from './ManagementPage';
 
 type SupportPageProps = {
-  workers: Worker[];
   businesses: Business[];
   payments: Payment[];
   payouts: Payout[];
   supportTickets: SupportTicket[];
-  approvals: VerificationRequest[];
+  approvals: AdminVerificationRequest[];
   search: string;
   onSearch: (value: string) => void;
   onSelect: (record: SelectedRecord) => void;
-  onReviewApproval: (id: string, action: 'approved' | 'rejected') => void;
   onResolveTicket: (ticketId: string) => void;
 };
 
 export function SupportPage({
-  workers,
   businesses,
   payments,
   payouts,
@@ -33,13 +29,11 @@ export function SupportPage({
   search,
   onSearch,
   onSelect,
-  onReviewApproval,
   onResolveTicket,
 }: SupportPageProps) {
   return (
     <ManagementPage
       section="support"
-      workers={workers}
       businesses={businesses}
       shifts={[]}
       payments={payments}
@@ -49,7 +43,6 @@ export function SupportPage({
       search={search}
       onSearch={onSearch}
       onSelect={onSelect}
-      onReviewApproval={onReviewApproval}
       onResolveTicket={onResolveTicket}
     />
   );
