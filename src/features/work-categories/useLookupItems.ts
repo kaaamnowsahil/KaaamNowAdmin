@@ -5,6 +5,7 @@ import {
   deleteLookupItem,
   getLookupItems,
   restoreLookupItem,
+  updateLookupItem,
   type LookupCollection,
   type LookupItem,
 } from '@/api/workCategories';
@@ -69,6 +70,31 @@ export function useLookupItems({ token, collection, onSessionExpired }: UseWorkC
     }
   };
 
+  const update = async (
+    item: LookupItem,
+    changes: { slug: string; name: string; icon: string; sort_order: number },
+  ) => {
+    setBusyId(item.id);
+    setError('');
+    setNotice('');
+    try {
+      const updated = await updateLookupItem(token, collection, item.id, changes);
+      setCategories(current =>
+        current
+          .map(existing => existing.id === updated.id ? updated : existing)
+          .sort((a, b) => a.sort_order - b.sort_order),
+      );
+      setNotice(`${updated.name} updated.`);
+      return true;
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) onSessionExpired();
+      else setError(cause instanceof Error ? cause.message : 'Could not update item.');
+      return false;
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const remove = async (category: LookupItem) => {
     setBusyId(category.id);
     setError('');
@@ -103,5 +129,5 @@ export function useLookupItems({ token, collection, onSessionExpired }: UseWorkC
     }
   };
 
-  return { busyId, categories, create, error, load, loading, notice, remove, restore, saving };
+  return { busyId, categories, create, error, load, loading, notice, remove, restore, saving, update };
 }

@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, RefreshCw, RotateCcw, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 import { LoadingIndicator } from '@/components/LoadingIndicator';
@@ -22,7 +22,7 @@ function slugFromName(name: string) {
 }
 
 export function LookupManagementPage({ token, collection, onSessionExpired }: LookupManagementPageProps) {
-  const { busyId, categories, create, error, load, loading, notice, remove, restore, saving } =
+  const { busyId, categories, create, error, load, loading, notice, remove, restore, saving, update } =
     useLookupItems({ token, collection, onSessionExpired });
   const title = collection === 'work-categories' ? 'Work categories' : 'Business / work types';
   const subject = collection === 'work-categories' ? 'work category' : 'business / work type';
@@ -31,6 +31,11 @@ export function LookupManagementPage({ token, collection, onSessionExpired }: Lo
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
   const [icon, setIcon] = useState('');
+  const [editingId, setEditingId] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editIcon, setEditIcon] = useState('');
+  const [editSortOrder, setEditSortOrder] = useState(0);
 
   const handleNameChange = (value: string) => {
     setName(value);
@@ -47,6 +52,26 @@ export function LookupManagementPage({ token, collection, onSessionExpired }: Lo
     setIcon('');
   };
 
+  const beginEdit = (item: (typeof categories)[number]) => {
+    setEditingId(item.id);
+    setEditName(item.name);
+    setEditSlug(item.slug);
+    setEditIcon(item.icon);
+    setEditSortOrder(item.sort_order);
+  };
+
+  const handleUpdate = async (event: FormEvent<HTMLFormElement>, item: (typeof categories)[number]) => {
+    event.preventDefault();
+    if (await update(item, {
+      name: editName.trim(),
+      slug: editSlug.trim(),
+      icon: editIcon.trim(),
+      sort_order: editSortOrder,
+    })) {
+      setEditingId('');
+    }
+  };
+
   return (
     <div className="page-stack">
       <section className="page-title-row">
@@ -57,7 +82,7 @@ export function LookupManagementPage({ token, collection, onSessionExpired }: Lo
             <span className="eyebrow-sub">{title}</span>
           </div>
           <h1>{title}</h1>
-          <p className="page-description">{`Add and remove ${plural} used across the marketplace.`}</p>
+          <p className="page-description">{`Add, edit, and remove ${plural} used across the marketplace.`}</p>
         </div>
         <button className="button button-secondary" onClick={() => void load()} disabled={loading}>
           <RefreshCw size={15} />
@@ -109,13 +134,47 @@ export function LookupManagementPage({ token, collection, onSessionExpired }: Lo
         {loading ? (
           <div className="work-category-loading"><LoadingIndicator label={`Loading ${plural}…`} /></div>
         ) : categories.length === 0 ? (
-          <div className="empty-state">No work categories found.</div>
+          <div className="empty-state">{`No ${plural} found.`}</div>
         ) : (
           <div className="table-scroll">
             <table className="admin-table">
               <thead><tr><th>Name</th><th>Slug</th><th>Icon</th><th>Order</th><th>Status</th><th>Action</th></tr></thead>
               <tbody>
-                {categories.map(category => (
+                {categories.map(category => editingId === category.id ? (
+                  <tr key={category.id}>
+                    <td colSpan={6}>
+                      <form className="work-category-edit" onSubmit={event => void handleUpdate(event, category)}>
+                        <label>
+                          Name
+                          <input required maxLength={120} value={editName} onChange={event => setEditName(event.target.value)} />
+                        </label>
+                        <label>
+                          Slug
+                          <input
+                            required
+                            maxLength={64}
+                            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                            title="Use lowercase letters, numbers, and single hyphens."
+                            value={editSlug}
+                            onChange={event => setEditSlug(event.target.value)}
+                          />
+                        </label>
+                        <label>
+                          Icon
+                          <input maxLength={64} value={editIcon} onChange={event => setEditIcon(event.target.value)} />
+                        </label>
+                        <label>
+                          Order
+                          <input min={0} required type="number" value={editSortOrder} onChange={event => setEditSortOrder(Number(event.target.value))} />
+                        </label>
+                        <button className="text-button" disabled={busyId === category.id} type="submit">
+                          {busyId === category.id ? <LoadingIndicator label="Saving…" className="loading-indicator-compact" /> : <><Check size={14} /> Save</>}
+                        </button>
+                        <button className="text-button" onClick={() => setEditingId('')} type="button"><X size={14} /> Cancel</button>
+                      </form>
+                    </td>
+                  </tr>
+                ) : (
                   <tr key={category.id}>
                     <td className="table-primary-cell">{category.name}</td>
                     <td>{category.slug}</td>
@@ -124,21 +183,27 @@ export function LookupManagementPage({ token, collection, onSessionExpired }: Lo
                     <td><StatusBadge tone={category.is_active ? 'success' : 'neutral'}>{category.is_active ? 'Active' : 'Inactive'}</StatusBadge></td>
                     <td>
                       {category.is_active ? (
-                        <button
-                          className="text-button danger-text"
-                          disabled={busyId === category.id}
-                          onClick={() => {
-                            if (window.confirm(`Delete "${category.name}"?`)) {
-                              void remove(category);
-                            }
-                          }}
-                        >
-                          {busyId === category.id ? (
-                            <LoadingIndicator label="Deleting…" className="loading-indicator-compact" />
-                          ) : <><Trash2 size={14} /> Delete</>}
-                        </button>
+                        <>
+                          <button className="text-button" disabled={busyId === category.id} onClick={() => beginEdit(category)} type="button">
+                            <Pencil size={14} /> Edit
+                          </button>
+                          <button
+                            className="text-button danger-text"
+                            disabled={busyId === category.id}
+                            onClick={() => {
+                              if (window.confirm(`Delete "${category.name}"?`)) {
+                                void remove(category);
+                              }
+                            }}
+                            type="button"
+                          >
+                            {busyId === category.id ? (
+                              <LoadingIndicator label="Deleting…" className="loading-indicator-compact" />
+                            ) : <><Trash2 size={14} /> Delete</>}
+                          </button>
+                        </>
                       ) : (
-                        <button className="text-button" disabled={busyId === category.id} onClick={() => void restore(category)}>
+                        <button className="text-button" disabled={busyId === category.id} onClick={() => void restore(category)} type="button">
                           {busyId === category.id ? (
                             <LoadingIndicator label="Restoring…" className="loading-indicator-compact" />
                           ) : <><RotateCcw size={14} /> Restore</>}

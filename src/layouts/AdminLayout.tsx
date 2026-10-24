@@ -17,6 +17,7 @@ import { RecordDetailPage } from '@/pages/RecordDetailPage';
 import { SupportPage } from '@/pages/SupportPage';
 import { WorkerDetailPage } from '@/pages/WorkerDetailPage';
 import { LookupManagementPage } from '@/pages/LookupManagementPage';
+import { ShiftFiltersPage } from '@/pages/ShiftFiltersPage';
 
 const pageTitles: Record<AdminSection, string> = {
   overview: 'Overview',
@@ -29,6 +30,7 @@ const pageTitles: Record<AdminSection, string> = {
   support: 'Support',
   'work-categories': 'Work categories',
   'business-types': 'Business / work types',
+  'shift-filters': 'Shift filters',
   'account-deletion': 'Account deletion',
 };
 
@@ -152,6 +154,8 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
               collection="business-types"
               onSessionExpired={onSignOut}
             />
+          ) : section === 'shift-filters' ? (
+            <ShiftFiltersPage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'support' ? (
             <SupportPage
               businesses={dashboard.businesses}
