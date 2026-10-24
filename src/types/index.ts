@@ -18,9 +18,5 @@ export type {
   TicketReply,
   TicketStatus,
 } from './support';
-export type {
-  DocumentType,
-  VerificationRequest,
-  VerificationStatus,
-} from './verification';
+export type { AdminVerificationRequest } from './verification';
 export type { KycStatus, Worker } from './worker';
