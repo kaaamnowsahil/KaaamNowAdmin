@@ -6,6 +6,7 @@ import {
   Building2,
   ChevronDown,
   CircleHelp,
+  FileText,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -44,6 +45,7 @@ const navigation: {
   { id: 'work-categories', label: 'Work categories', icon: ListChecks },
   { id: 'business-types', label: 'Business / work types', icon: Boxes },
   { id: 'shift-filters', label: 'Shift filters', icon: SlidersHorizontal },
+  { id: 'content', label: 'Terms & Conditions / FAQ', icon: FileText },
   { id: 'account-deletion', label: 'Account deletion', icon: ShieldAlert },
 ];
 

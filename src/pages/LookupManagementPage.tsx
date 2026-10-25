@@ -1,6 +1,7 @@
 import { Check, Pencil, Plus, RefreshCw, RotateCcw, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
+import { AppLoader } from '@/components/AppLoader';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLookupItems } from '@/features/work-categories/useLookupItems';
@@ -132,7 +133,7 @@ export function LookupManagementPage({ token, collection, onSessionExpired }: Lo
           <div><h2>{`All ${plural}`}</h2><p>{categories.length} items</p></div>
         </div>
         {loading ? (
-          <div className="work-category-loading"><LoadingIndicator label={`Loading ${plural}…`} /></div>
+          <AppLoader label={`Loading ${plural}…`} />
         ) : categories.length === 0 ? (
           <div className="empty-state">{`No ${plural} found.`}</div>
         ) : (

@@ -1,6 +1,7 @@
 import { ArrowLeft, Clock3, RefreshCw, ShieldAlert, UserRound } from 'lucide-react';
 
 import type { DeletionStatus, HoldBasis } from '@/api/accountDeletion';
+import { AppLoader } from '@/components/AppLoader';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { useAccountDeletion } from '@/features/account-deletion/useAccountDeletion';
 
@@ -89,7 +90,7 @@ export function AccountDeletionPage({ token, onSessionExpired }: AccountDeletion
             {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
-        <span className="muted-copy">{loading ? <LoadingIndicator label="Loading requests…" /> : `${total} ${total === 1 ? 'request' : 'requests'}`}</span>
+        <span className="muted-copy">{loading ? null : `${total} ${total === 1 ? 'request' : 'requests'}`}</span>
       </div>
 
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -101,7 +102,7 @@ export function AccountDeletionPage({ token, onSessionExpired }: AccountDeletion
             <div><h2>{statusLabels[status]}</h2><p>Server-managed review queue</p></div>
             <span className="queue-count">{total}</span>
           </div>
-          {loading ? <div className="empty-state"><LoadingIndicator label="Loading requests…" /></div> : queue.length === 0 ? (
+          {loading ? <AppLoader label="Loading requests…" /> : queue.length === 0 ? (
             <p className="empty-state">No requests in this queue.</p>
           ) : queue.map(request => (
             <button
@@ -129,7 +130,7 @@ export function AccountDeletionPage({ token, onSessionExpired }: AccountDeletion
         </section>
 
         <section className="deletion-detail panel">
-          {detailLoading ? <div className="empty-state"><LoadingIndicator label="Loading request details…" /></div> : !selectedRequest ? (
+          {detailLoading ? <AppLoader label="Loading request details…" /> : !selectedRequest ? (
             <div className="empty-state"><ShieldAlert size={24} /><strong>Select a request to review</strong><span>Details and audit history are fetched from the admin API.</span></div>
           ) : (
             <>
