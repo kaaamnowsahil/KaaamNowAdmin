@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode === 'development' ? 'dev' : mode, process.cwd(), 'VITE_');
 
   return {
+    // Served at kaaamnow.in/admin (proxied from the main site), so assets live under /admin/.
+    base: '/admin/',
+    build: { outDir: 'dist/admin' },
     plugins: [react()],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
