@@ -1,0 +1,5 @@
+{
+  "outputDirectory": "dist",
+  "redirects": [{ "source": "/", "destination": "/admin/", "permanent": false }],
+  "rewrites": [{ "source": "/admin/:path*", "destination": "/admin/index.html" }]
+}
