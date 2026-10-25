@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 
-import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { AppLoader } from '@/components/AppLoader';
 import { ShiftFilterGroup } from '@/features/shift-filters/ShiftFilterGroup';
 import { useShiftFilterOptions } from '@/features/shift-filters/useShiftFilterOptions';
 import type { ShiftFilterType } from '@/api/shiftFilters';
@@ -64,9 +64,7 @@ export function ShiftFiltersPage({ token, onSessionExpired }: ShiftFiltersPagePr
       {filters.notice ? <div className="inline-notice" role="status">{filters.notice}</div> : null}
 
       {filters.loading ? (
-        <div className="work-category-loading">
-          <LoadingIndicator label="Loading shift filters…" />
-        </div>
+        <AppLoader label="Loading shift filters…" />
       ) : (
         groups.map(group => (
           <ShiftFilterGroup

@@ -54,10 +54,14 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .loading-indicator { display: inline-flex; align-items: center; gap: 8px; color: inherit; }
 .loading-indicator-compact { gap: 6px; font-size: inherit; }
 .loading-spinner { width: 18px; height: 18px; flex: none; border: 2px solid #e3dcf8; border-top-color: #7351d8; border-radius: 50%; animation: loading-spin .8s linear infinite; }
-.admin-loading-screen { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; color: #62697b; pointer-events: none; font-size: 13px; font-weight: 500; }
-.admin-loading-screen .loading-indicator { flex-direction: column; gap: 14px; padding: 14px 18px; border-radius: 12px; background: rgba(255, 255, 255, .92); box-shadow: 0 6px 24px rgba(31, 36, 58, .12); }
-.admin-loading-screen .loading-spinner { width: 34px; height: 34px; border-width: 3px; }
 @keyframes loading-spin { to { transform: rotate(360deg); } }
+.app-loader { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #62697b; background: rgba(247, 248, 251, .78); backdrop-filter: blur(4px); font-size: 12px; font-weight: 500; animation: app-loader-fade-in .18s ease-out; }
+.app-loader-badge { position: relative; display: grid; width: 72px; height: 72px; place-items: center; }
+.app-loader-ring { position: absolute; inset: 0; border: 3px solid #e3dcf8; border-top-color: #8b5cf6; border-radius: 50%; animation: loading-spin .9s linear infinite; }
+.app-loader-logo { animation: app-loader-pulse .9s ease-in-out infinite alternate; }
+@keyframes app-loader-pulse { from { transform: scale(.92); } to { transform: scale(1.04); } }
+@keyframes app-loader-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .app-loader-ring, .app-loader-logo { animation: none; } }
 .sidebar {
   position: fixed;
   z-index: 30;
@@ -578,6 +582,26 @@ h1 { margin-top: 6px; color: #171a2a; font-size: 24px; font-weight: 700; letter-
 .shift-filter-edit { display: grid; min-width: 820px; grid-template-columns: minmax(130px,1.1fr) minmax(130px,1fr) repeat(2,minmax(110px,.8fr)) 70px auto auto; align-items: end; gap: 9px; padding: 8px 0; }
 .shift-filter-actions { display: flex; align-items: center; gap: 10px; }
 .shift-filter-group .admin-table td:last-child { width: auto; white-space: nowrap; }
+
+.content-panel { padding: 17px; }
+.content-panel .panel-heading { margin-bottom: 14px; }
+.content-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 14px 0; }
+.content-form label { display: flex; min-width: 0; flex-direction: column; gap: 6px; color: #4d5365; font-size: 9px; font-weight: 600; }
+.content-form input, .content-form select, .content-form textarea { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid #e2e4ec; border-radius: 8px; color: #303547; background: white; font: inherit; font-size: 10px; font-weight: 400; }
+.content-form textarea { resize: vertical; line-height: 1.5; }
+.content-form-wide { grid-column: 1 / -1; }
+.content-form .content-form-check { flex-direction: row; align-items: center; gap: 7px; }
+.content-form .content-form-check input { width: auto; }
+.content-form-actions { display: flex; justify-content: flex-end; gap: 8px; grid-column: 1 / -1; }
+.content-form-actions .button { display: inline-flex; align-items: center; gap: 6px; }
+.content-empty { color: #9298a8; font-size: 10px; }
+.content-list { display: flex; flex-direction: column; gap: 8px; list-style: none; }
+.content-list li { display: flex; justify-content: space-between; gap: 12px; padding: 11px 12px; border: 1px solid #eceef4; border-radius: 8px; }
+.content-list strong { display: block; margin-top: 5px; color: #242838; font-size: 10px; }
+.content-list p { margin-top: 4px; color: #62697b; font-size: 9px; line-height: 1.5; white-space: pre-line; }
+.content-list-inactive { opacity: .55; }
+.content-list-actions { display: flex; align-items: flex-start; gap: 6px; }
+.content-tag { display: inline-block; margin-right: 5px; padding: 2px 7px; border-radius: 999px; color: #555c70; background: #f2f3f7; font-size: 8px; font-weight: 600; }
 
 @media (min-width: 1500px) {
   .main-content { padding-right: 45px; padding-left: 45px; }

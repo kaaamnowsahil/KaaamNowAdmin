@@ -10,6 +10,7 @@ export type AdminSection =
   | 'work-categories'
   | 'business-types'
   | 'shift-filters'
+  | 'content'
   | 'account-deletion';
 
 /** Route paths — use these instead of string literals. */
@@ -34,6 +35,7 @@ export const ROUTES = {
   workCategories: '/work-categories',
   businessTypes: '/business-types',
   shiftFilters: '/shift-filters',
+  content: '/terms-faq',
 } as const;
 
 export const SECTION_ROUTES: Record<AdminSection, string> = {
@@ -48,6 +50,7 @@ export const SECTION_ROUTES: Record<AdminSection, string> = {
   'work-categories': ROUTES.workCategories,
   'business-types': ROUTES.businessTypes,
   'shift-filters': ROUTES.shiftFilters,
+  content: ROUTES.content,
   'account-deletion': ROUTES.accountDeletion,
 };
 
@@ -63,5 +66,6 @@ export const ROUTE_SECTIONS: Record<string, AdminSection> = {
   [ROUTES.workCategories]: 'work-categories',
   [ROUTES.businessTypes]: 'business-types',
   [ROUTES.shiftFilters]: 'shift-filters',
+  [ROUTES.content]: 'content',
   [ROUTES.accountDeletion]: 'account-deletion',
 };

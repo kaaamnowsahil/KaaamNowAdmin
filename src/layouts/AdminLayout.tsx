@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
-import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { AppLoader } from '@/components/AppLoader';
 import { ROUTE_SECTIONS, ROUTES, SECTION_ROUTES } from '@/constants/routes';
 import type { AdminSection } from '@/constants/routes';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
@@ -18,6 +18,7 @@ import { SupportPage } from '@/pages/SupportPage';
 import { WorkerDetailPage } from '@/pages/WorkerDetailPage';
 import { LookupManagementPage } from '@/pages/LookupManagementPage';
 import { ShiftFiltersPage } from '@/pages/ShiftFiltersPage';
+import { ContentPage } from '@/pages/ContentPage';
 
 const pageTitles: Record<AdminSection, string> = {
   overview: 'Overview',
@@ -31,6 +32,7 @@ const pageTitles: Record<AdminSection, string> = {
   'work-categories': 'Work categories',
   'business-types': 'Business / work types',
   'shift-filters': 'Shift filters',
+  content: 'Terms & Conditions / FAQ',
   'account-deletion': 'Account deletion',
 };
 
@@ -156,6 +158,8 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
             />
           ) : section === 'shift-filters' ? (
             <ShiftFiltersPage token={accessToken} onSessionExpired={onSignOut} />
+          ) : section === 'content' ? (
+            <ContentPage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'support' ? (
             <SupportPage
               businesses={dashboard.businesses}
@@ -192,9 +196,7 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
       </main>
 
       {dashboard.directoryLoading ? (
-        <div className="admin-loading-screen">
-          <LoadingIndicator label="Loading marketplace profiles…" />
-        </div>
+        <AppLoader label="Loading marketplace profiles…" />
       ) : null}
 
       {dashboard.toast ? (
