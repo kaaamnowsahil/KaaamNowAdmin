@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Scale,
   Settings2,
   SlidersHorizontal,
   ShieldAlert,
@@ -46,6 +47,7 @@ const navigation: {
   { id: 'business-types', label: 'Business / work types', icon: Boxes },
   { id: 'shift-filters', label: 'Shift filters', icon: SlidersHorizontal },
   { id: 'content', label: 'Terms & Conditions / FAQ', icon: FileText },
+  { id: 'marketplace', label: 'Marketplace rules', icon: Scale },
   { id: 'account-deletion', label: 'Account deletion', icon: ShieldAlert },
 ];
 
