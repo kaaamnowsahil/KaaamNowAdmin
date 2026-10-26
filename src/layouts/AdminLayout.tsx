@@ -19,6 +19,7 @@ import { WorkerDetailPage } from '@/pages/WorkerDetailPage';
 import { LookupManagementPage } from '@/pages/LookupManagementPage';
 import { ShiftFiltersPage } from '@/pages/ShiftFiltersPage';
 import { ContentPage } from '@/pages/ContentPage';
+import { MarketplacePage } from '@/pages/MarketplacePage';
 
 const pageTitles: Record<AdminSection, string> = {
   overview: 'Overview',
@@ -33,6 +34,7 @@ const pageTitles: Record<AdminSection, string> = {
   'business-types': 'Business / work types',
   'shift-filters': 'Shift filters',
   content: 'Terms & Conditions / FAQ',
+  marketplace: 'Marketplace rules',
   'account-deletion': 'Account deletion',
 };
 
@@ -160,6 +162,8 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
             <ShiftFiltersPage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'content' ? (
             <ContentPage token={accessToken} onSessionExpired={onSignOut} />
+          ) : section === 'marketplace' ? (
+            <MarketplacePage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'support' ? (
             <SupportPage
               businesses={dashboard.businesses}
