@@ -18,6 +18,9 @@ export function formatDate(value: string | null | undefined) {
 }
 
 export function errorText(cause: unknown) {
+  if (cause instanceof ApiError && cause.requestId && (cause.status ?? 0) >= 500) {
+    return `${cause.message} (Ref: ${cause.requestId})`;
+  }
   return cause instanceof Error ? cause.message : 'Something went wrong.';
 }
 

@@ -12,7 +12,10 @@ export type AdminSection =
   | 'shift-filters'
   | 'content'
   | 'marketplace'
-  | 'account-deletion';
+  | 'account-deletion'
+  | 'activity-log'
+  | 'settings'
+  | 'help';
 
 /** Route paths — use these instead of string literals. */
 export const ROUTES = {
@@ -38,6 +41,8 @@ export const ROUTES = {
   shiftFilters: '/shift-filters',
   content: '/terms-faq',
   marketplace: '/marketplace',
+  activityLog: '/activity-log',
+  help: '/help',
 } as const;
 
 export const SECTION_ROUTES: Record<AdminSection, string> = {
@@ -55,6 +60,9 @@ export const SECTION_ROUTES: Record<AdminSection, string> = {
   content: ROUTES.content,
   marketplace: ROUTES.marketplace,
   'account-deletion': ROUTES.accountDeletion,
+  'activity-log': ROUTES.activityLog,
+  settings: ROUTES.settings,
+  help: ROUTES.help,
 };
 
 export const ROUTE_SECTIONS: Record<string, AdminSection> = {
@@ -72,4 +80,7 @@ export const ROUTE_SECTIONS: Record<string, AdminSection> = {
   [ROUTES.content]: 'content',
   [ROUTES.marketplace]: 'marketplace',
   [ROUTES.accountDeletion]: 'account-deletion',
+  [ROUTES.activityLog]: 'activity-log',
+  [ROUTES.settings]: 'settings',
+  [ROUTES.help]: 'help',
 };

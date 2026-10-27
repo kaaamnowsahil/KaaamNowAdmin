@@ -1,34 +1,22 @@
-import type { UserRole } from './common';
+import type {
+  TicketPriority,
+  TicketStatus,
+  TicketTopic,
+} from '@/api/supportTickets';
 
-export type TicketCategory =
-  | 'payment'
-  | 'noShow'
-  | 'dispute'
-  | 'safety'
-  | 'account'
-  | 'other';
-
-export type TicketPriority = 'low' | 'medium' | 'high';
-
-export type TicketStatus = 'open' | 'inProgress' | 'resolved';
-
-export type TicketReply = {
-  id: string;
-  author: 'admin' | 'user';
-  message: string;
-  at: string;
-};
+export type { TicketPriority, TicketStatus, TicketTopic };
 
 export type SupportTicket = {
   id: string;
   subject: string;
   message: string;
-  category: TicketCategory;
+  topic: TicketTopic;
   priority: TicketPriority;
   status: TicketStatus;
-  raisedBy: { role: UserRole; id: string; name: string };
-  shiftId?: string;
+  raisedBy: { id: string; name: string; phone: string | null };
+  shiftId: string | null;
+  assignmentId: string | null;
+  resolutionNote: string | null;
   createdAt: string;
   updatedAt: string;
-  replies: TicketReply[];
 };

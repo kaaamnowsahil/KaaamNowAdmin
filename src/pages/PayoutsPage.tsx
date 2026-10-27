@@ -2,7 +2,6 @@ import type {
   Business,
   Payment,
   Payout,
-  PayoutStatus,
   AdminVerificationRequest,
 } from '@/types';
 
@@ -15,10 +14,13 @@ type PayoutsPageProps = {
   approvals: AdminVerificationRequest[];
   search: string;
   onSearch: (value: string) => void;
+  statusFilter: string;
+  onStatusFilterChange: (status: string) => void;
   onSelect: (record: SelectedRecord) => void;
-  onUpdatePayout: (payoutId: string, status: PayoutStatus) => void;
+  serverTotal?: number;
 };
 
+/** Read-only: withdrawal status is driven by the payout provider sync, not the dashboard. */
 export function PayoutsPage({
   businesses,
   payments,
@@ -26,13 +28,15 @@ export function PayoutsPage({
   approvals,
   search,
   onSearch,
+  statusFilter,
+  onStatusFilterChange,
   onSelect,
-  onUpdatePayout,
+  serverTotal,
 }: PayoutsPageProps) {
   return (
     <ManagementPage
       section="payouts"
-        businesses={businesses}
+      businesses={businesses}
       shifts={[]}
       payments={payments}
       payouts={payouts}
@@ -40,8 +44,10 @@ export function PayoutsPage({
       approvals={approvals}
       search={search}
       onSearch={onSearch}
+      statusFilter={statusFilter}
+      onStatusFilterChange={onStatusFilterChange}
       onSelect={onSelect}
-      onUpdatePayout={onUpdatePayout}
+      serverTotal={serverTotal}
     />
   );
 }

@@ -1,19 +1,20 @@
-/** Same destinations the worker app offers for withdrawals. */
-export type PayoutMethod = 'UPI' | 'Paytm' | 'Bank';
+export type PayoutMethod = 'UPI' | 'Paytm' | 'Bank' | 'Unknown';
 
-export type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed';
+/** `withdrawals.status`; moved only by the payout provider sync, never by the dashboard. */
+export type PayoutStatus = 'initiated' | 'processing' | 'paid' | 'failed';
 
 export type Payout = {
   id: string;
   reference: string;
   workerId: string;
   workerName: string;
-  amount: number;
+  amountMinor: number;
   method: PayoutMethod;
   /** UPI id, wallet number or masked bank account. */
   destination: string;
+  provider: string;
   requestedAt: string;
-  processedAt?: string;
+  completedAt: string | null;
   status: PayoutStatus;
-  failureReason?: string;
+  failureReason: string | null;
 };

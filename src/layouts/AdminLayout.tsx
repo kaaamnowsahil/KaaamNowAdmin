@@ -20,6 +20,9 @@ import { LookupManagementPage } from '@/pages/LookupManagementPage';
 import { ShiftFiltersPage } from '@/pages/ShiftFiltersPage';
 import { ContentPage } from '@/pages/ContentPage';
 import { MarketplacePage } from '@/pages/MarketplacePage';
+import { ActivityLogPage } from '@/pages/ActivityLogPage';
+import { SettingsPage } from '@/pages/SettingsPage';
+import { HelpPage } from '@/pages/HelpPage';
 
 const pageTitles: Record<AdminSection, string> = {
   overview: 'Overview',
@@ -36,6 +39,9 @@ const pageTitles: Record<AdminSection, string> = {
   content: 'Terms & Conditions / FAQ',
   marketplace: 'Marketplace rules',
   'account-deletion': 'Account deletion',
+  'activity-log': 'Activity log',
+  settings: 'Settings',
+  help: 'Help & support',
 };
 
 type AdminLayoutProps = {
@@ -66,10 +72,15 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
       />
       <main className="main-shell">
         <Topbar
+          section={section}
           search={dashboard.search}
           onSearch={dashboard.setSearch}
+          statusFilter={dashboard.statusFilter}
+          onStatusFilter={dashboard.setStatusFilter}
           pendingApprovals={dashboard.pendingApprovals}
           onOpenApprovals={() => navigateToSection('approvals')}
+          onNavigate={navigateToSection}
+          onSignOut={onSignOut}
         />
         <div className="main-content">
           {section === 'overview' && (dashboard.workersError || dashboard.businessesError) ? (
@@ -95,6 +106,17 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
                 Retry
               </button>
             </div>
+          ) : null}
+          {(section === 'overview' || section === 'shifts' || section === 'payments' || section === 'payouts' || section === 'support') && dashboard.recordsError ? (
+            <div className="inline-error" role="alert">
+              {dashboard.recordsError}{' '}
+              <button className="text-action" onClick={() => void dashboard.reloadRecords()}>
+                Retry
+              </button>
+            </div>
+          ) : null}
+          {section === 'support' && dashboard.ticketError ? (
+            <div className="inline-error" role="alert">{dashboard.ticketError}</div>
           ) : null}
           {(section === 'overview' || section === 'workers' || section === 'businesses' || section === 'approvals') && dashboard.directoryActionError ? (
             <div className="inline-error" role="alert">{dashboard.directoryActionError}</div>
@@ -125,12 +147,14 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
           ) : section === 'overview' ? (
             <OverviewPage
               workers={dashboard.workers}
-              businesses={dashboard.businesses}
               shifts={dashboard.shifts}
               payments={dashboard.paymentRows}
               payouts={dashboard.payoutRows}
               supportTickets={dashboard.supportTickets}
               pendingApprovals={dashboard.pendingApprovals}
+              metrics={dashboard.metrics}
+              metricsError={dashboard.metricsError}
+              onRetryMetrics={() => void dashboard.reloadRecords()}
               onOpenSection={navigateToSection}
             />
           ) : section === 'payouts' ? (
@@ -141,8 +165,10 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
               approvals={dashboard.approvalRows}
               search={dashboard.search}
               onSearch={dashboard.setSearch}
+              statusFilter={dashboard.statusFilter}
+              onStatusFilterChange={dashboard.setStatusFilter}
               onSelect={dashboard.setSelectedRecord}
-              onUpdatePayout={dashboard.updatePayout}
+              serverTotal={dashboard.recordTotals?.withdrawals}
             />
           ) : section === 'account-deletion' ? (
             <AccountDeletionPage token={accessToken} onSessionExpired={onSignOut} />
@@ -164,6 +190,12 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
             <ContentPage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'marketplace' ? (
             <MarketplacePage token={accessToken} onSessionExpired={onSignOut} />
+          ) : section === 'activity-log' ? (
+            <ActivityLogPage token={accessToken} onSessionExpired={onSignOut} />
+          ) : section === 'settings' ? (
+            <SettingsPage accessToken={accessToken} onSignOut={onSignOut} />
+          ) : section === 'help' ? (
+            <HelpPage onOpenSection={navigateToSection} />
           ) : section === 'support' ? (
             <SupportPage
               businesses={dashboard.businesses}
@@ -173,8 +205,12 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
               approvals={dashboard.approvalRows}
               search={dashboard.search}
               onSearch={dashboard.setSearch}
+              statusFilter={dashboard.statusFilter}
+              onStatusFilterChange={dashboard.setStatusFilter}
               onSelect={dashboard.setSelectedRecord}
-              onResolveTicket={dashboard.resolveTicket}
+              onResolveTicket={ticketId => void dashboard.resolveTicket(ticketId)}
+              busyTicketId={dashboard.busyTicketId}
+              serverTotal={dashboard.recordTotals?.supportTickets}
             />
           ) : (
             <ManagementPage
@@ -188,9 +224,16 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
               approvals={dashboard.approvalRows}
               search={dashboard.search}
               onSearch={dashboard.setSearch}
+              statusFilter={dashboard.statusFilter}
+              onStatusFilterChange={dashboard.setStatusFilter}
               onSelect={dashboard.setSelectedRecord}
-              onUpdatePayout={dashboard.updatePayout}
-              onResolveTicket={dashboard.resolveTicket}
+              serverTotal={
+                section === 'shifts'
+                  ? dashboard.recordTotals?.shifts
+                  : section === 'payments'
+                    ? dashboard.recordTotals?.payments
+                    : undefined
+              }
               busyDirectoryId={dashboard.busyDirectoryId}
               busyVerificationDecision={dashboard.busyVerificationDecision}
               onVerifyProfile={dashboard.verifyProfile}
@@ -199,8 +242,8 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
         </div>
       </main>
 
-      {dashboard.directoryLoading ? (
-        <AppLoader label="Loading marketplace profiles…" />
+      {dashboard.directoryLoading || dashboard.recordsLoading ? (
+        <AppLoader label={dashboard.directoryLoading ? 'Loading marketplace profiles…' : 'Loading marketplace records…'} />
       ) : null}
 
       {dashboard.toast ? (

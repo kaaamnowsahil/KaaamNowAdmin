@@ -1,10 +1,8 @@
 import { formatText } from '@/utils/text';
 import {
   ArrowDownToLine,
-  ArrowRight,
   Check,
   ChevronDown,
-  Clock3,
   Eye,
   MoreHorizontal,
   Search,
@@ -14,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 import { StatusBadge } from '@/components/StatusBadge';
+import { ALL_STATUSES } from '@/constants/quickFilters';
 import { ProfileAvatar } from '@/components/ProfileAvatar';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ManagementMetrics, type ManagementMetric } from '@/components/ManagementMetrics';
@@ -22,13 +21,12 @@ import type {
   Business,
   Payment,
   Payout,
-  PayoutStatus,
   SupportTicket,
   AdminVerificationRequest,
   Worker,
 } from '@/types';
 import { downloadCsv } from '@/utils/csv';
-import { formatRupees, initialsOf } from '@/utils/format';
+import { formatMinorRupees, initialsOf } from '@/utils/format';
 
 export type AdminSection =
   | 'workers'
@@ -61,9 +59,14 @@ type ManagementPageProps = {
   approvals: AdminVerificationRequest[];
   search: string;
   onSearch: (value: string) => void;
+  /** Controlled by the top-bar quick filters when provided. */
+  statusFilter?: string;
+  onStatusFilterChange?: (status: string) => void;
   onSelect: (record: SelectedRecord) => void;
-  onUpdatePayout?: (payoutId: string, status: PayoutStatus) => void;
   onResolveTicket?: (ticketId: string) => void;
+  busyTicketId?: string;
+  /** Rows that exist server-side; shown when only the newest records were loaded. */
+  serverTotal?: number;
   onVerifyProfile?: (
     type: 'worker' | 'business',
     profileId: string,
@@ -96,19 +99,21 @@ const sectionMeta: Record<AdminSection, { title: string; description: string; la
   businesses: { title: 'Businesses', description: 'Manage business profiles, verification and marketplace activity.', label: 'ALL BUSINESSES', action: 'Export businesses', columns: ['Business', 'Business type', 'Location', 'Rating', 'Reviews', 'Status'] },
   shifts: { title: 'Shifts', description: 'Monitor live requests and scheduled work across the city.', label: 'ALL SHIFTS', action: 'Export shifts', columns: ['Shift', 'Business', 'Schedule', 'Workers', 'Pay rate', 'Status'] },
   payments: { title: 'Payments', description: 'Track business charges, platform fees and transaction status.', label: 'TRANSACTION LEDGER', action: 'Export ledger', columns: ['Transaction', 'Business', 'Date', 'Method', 'Amount', 'Status'] },
-  payouts: { title: 'Payouts', description: 'Review worker withdrawals and payout completion across channels.', label: 'PAYOUT QUEUE', action: 'Export payouts', columns: ['Worker', 'Method', 'Requested', 'Amount', 'Status'] },
+  payouts: { title: 'Payouts', description: 'Worker withdrawals. Status is updated by the payout provider, not from this dashboard.', label: 'PAYOUT QUEUE', action: 'Export payouts', columns: ['Worker', 'Method', 'Requested', 'Amount', 'Status'] },
   approvals: { title: 'Approvals', description: 'Review and verify pending worker and business profiles.', label: 'REVIEW QUEUE', action: 'Export queue', columns: ['Applicant', 'Profile type', 'Phone', 'Location', 'Status'] },
-  support: { title: 'Support', description: 'Track critical issues raised by workers and businesses across the platform.', label: 'SUPPORT TICKETS', action: 'Export tickets', columns: ['Subject', 'Raised by', 'Category', 'Priority', 'Status'] },
+  support: { title: 'Support', description: 'Track critical issues raised by workers and businesses across the platform.', label: 'SUPPORT TICKETS', action: 'Export tickets', columns: ['Subject', 'Raised by', 'Topic', 'Priority', 'Status'] },
 };
+
+const PAGE_SIZE = 25;
 
 const dateLabel = (value: string, locale: string) =>
   new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
 
 const statusTone = (status: string): Row['statusTone'] => {
   const normalized = normalizeStatus(status);
-  if (['active', 'verified', 'paid', 'completed', 'approved', 'filled', 'resolved'].includes(normalized)) return 'success';
-  if (['pending', 'processing', 'under review', 'staffing', 'partially filled', 'finding', 'open', 'in progress'].includes(normalized)) return 'warning';
-  if (['blocked', 'rejected', 'failed', 'cancelled'].includes(normalized)) return 'danger';
+  if (['active', 'verified', 'paid', 'succeeded', 'completed', 'approved', 'filled', 'closed'].includes(normalized)) return 'success';
+  if (['pending', 'processing', 'initiated', 'searching', 'awaiting payment', 'open', 'in progress'].includes(normalized)) return 'warning';
+  if (['blocked', 'rejected', 'failed', 'cancelled', 'expired'].includes(normalized)) return 'danger';
   if (['live'].includes(normalized)) return 'purple';
   return 'neutral';
 };
@@ -129,21 +134,30 @@ export function ManagementPage({
   approvals,
   search,
   onSearch,
+  statusFilter: controlledStatus,
+  onStatusFilterChange,
   onSelect,
-  onUpdatePayout,
   onResolveTicket,
+  busyTicketId,
+  serverTotal,
   onVerifyProfile,
   busyDirectoryId,
   busyVerificationDecision,
 }: ManagementPageProps) {
   const locale = 'en-IN';
   const meta = sectionMeta[section];
-  const [statusFilter, setStatusFilter] = useState('All statuses');
+  const [localStatus, setLocalStatus] = useState(ALL_STATUSES);
+  const statusFilter = controlledStatus ?? localStatus;
+  const setStatusFilter = onStatusFilterChange ?? setLocalStatus;
   const [attributeFilter, setAttributeFilter] = useState('All categories');
+  const [page, setPage] = useState(0);
   useEffect(() => {
-    setStatusFilter('All statuses');
+    setLocalStatus(ALL_STATUSES);
     setAttributeFilter('All categories');
   }, [section]);
+  useEffect(() => {
+    setPage(0);
+  }, [section, search, statusFilter, attributeFilter]);
   const rows = useMemo(
     () =>
       getRows(
@@ -169,7 +183,7 @@ export function ManagementPage({
         .includes(query);
     return (
       matchesSearch &&
-      (statusFilter === 'All statuses' ||
+      (statusFilter === ALL_STATUSES ||
         normalizeStatus(row.status) === normalizeStatus(statusFilter))
       &&
       (attributeFilter === 'All categories' ||
@@ -178,6 +192,10 @@ export function ManagementPage({
         ))
     );
   });
+  const pageCount = Math.max(1, Math.ceil(matchingRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = currentPage * PAGE_SIZE;
+  const pageRows = matchingRows.slice(pageStart, pageStart + PAGE_SIZE);
   const pendingApprovals = approvals.filter(approval => approval.status === 'pending');
   const filterOptions = [...new Set(rows.flatMap(row => row.cells))]
     .filter(value => value.length > 0)
@@ -211,8 +229,6 @@ export function ManagementPage({
         <div>
           <div className="eyebrow-row">
             <span className="eyebrow">{meta.label}</span>
-            <span className="title-divider">/</span>
-            <span className="eyebrow-sub">{'Bengaluru marketplace'}</span>
           </div>
           <h1>{meta.title}</h1>
           <p className="page-description">{meta.description}</p>
@@ -227,7 +243,6 @@ export function ManagementPage({
         <div className="approval-summary">
           <div className="approval-summary-icon"><ShieldCheck size={20} /></div>
           <div><strong>{formatText('{{count}} profiles need review', { count: pendingApprovals.length })}</strong><span>{'Review profile details and verification status.'}</span></div>
-          <span className="approval-sla"><Clock3 size={14} /> {formatText('Average review time: {{hours}} hrs', { hours: 2.4 })}</span>
         </div>
       ) : (
         <ManagementMetrics metrics={metrics} />
@@ -251,8 +266,8 @@ export function ManagementPage({
             </label>
             <label className="filter-select">
               <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'Filter by status'}>
-                <option value="All statuses">{'All statuses'}</option>
-                {[...new Set(rows.map(row => row.status))].map(status => <option key={status} value={status}>{status}</option>)}
+                <option value={ALL_STATUSES}>{'All statuses'}</option>
+                {[...new Set([...rows.map(row => row.status), ...(statusFilter === ALL_STATUSES ? [] : [statusFilter])])].map(status => <option key={status} value={status}>{status}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
@@ -282,7 +297,7 @@ export function ManagementPage({
               </tr>
             </thead>
             <tbody>
-              {matchingRows.map(row => (
+              {pageRows.map(row => (
                 <tr
                   key={row.id}
                   className={isDirectory ? 'clickable-row' : undefined}
@@ -346,20 +361,12 @@ export function ManagementPage({
                           </>
                         ) : null}
                       </div>
-                    ) : section === 'support' && onResolveTicket && !matchesStatus(row.status, 'resolved') ? (
+                    ) : section === 'support' && onResolveTicket && !matchesStatus(row.status, 'closed') ? (
                       <div className="approval-row-actions">
                         <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, imageUrl: row.imageUrl })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={formatText('Resolve {{name}}', { name: row.title })} onClick={() => onResolveTicket(row.id)}><Check size={15} /></button>
-                      </div>
-                    ) : section === 'payouts' && onUpdatePayout && matchesStatus(row.status, 'pending') ? (
-                      <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={formatText('Start processing payout for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'processing')}><ArrowRight size={15} /></button>
-                      </div>
-                    ) : section === 'payouts' && onUpdatePayout && matchesStatus(row.status, 'processing') ? (
-                      <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><Eye size={16} /></button>
-                        <button className="approval-action approve-action" aria-label={formatText('Mark payout completed for {{name}}', { name: row.title })} onClick={() => onUpdatePayout(row.id, 'completed')}><Check size={15} /></button>
+                        <button className="approval-action approve-action" disabled={Boolean(busyTicketId)} aria-label={formatText('Close ticket {{name}}', { name: row.title })} onClick={() => onResolveTicket(row.id)}>
+                          {busyTicketId === row.id ? <LoadingIndicator label="Closing…" className="loading-indicator-compact" /> : <Check size={15} />}
+                        </button>
                       </div>
                     ) : (
                       <div className="last-cell-actions">
@@ -376,17 +383,23 @@ export function ManagementPage({
           </table>
         </div>
         <div className="table-pagination">
-          <span>{formatText('Showing {{start}}–{{end}} of {{total}} results', { start: matchingRows.length ? 1 : 0, end: matchingRows.length, total: matchingRows.length })}</span>
-          <div><button disabled>{'Previous'}</button><button className="page-current">1</button><button disabled>{'Next'}</button></div>
+          <span>{formatText('Showing {{start}}–{{end}} of {{total}} results', { start: pageRows.length ? pageStart + 1 : 0, end: pageStart + pageRows.length, total: matchingRows.length })}</span>
+          <div>
+            <button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{'Previous'}</button>
+            <button className="page-current">{currentPage + 1}</button>
+            <button disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>{'Next'}</button>
+          </div>
         </div>
       </section>
-      <div className="table-footnote"><span>{'Data refreshes automatically'}</span><span>{'Last updated a few seconds ago'} <ArrowRight size={13} /></span></div>
+      {serverTotal !== undefined && serverTotal > rows.length ? (
+        <div className="table-footnote"><span>{formatText('Showing the newest {{loaded}} of {{total}} records. Use the generic admin export for the full table.', { loaded: rows.length, total: serverTotal })}</span></div>
+      ) : null}
 
       {section === 'approvals' && pendingApprovals.length === 0 ? (
         <div className="all-reviewed"><Check size={16} /> {'All verification requests have been reviewed.'}</div>
       ) : null}
 
-      {section === 'support' && supportTickets.filter(ticket => ticket.status !== 'resolved').length === 0 ? (
+      {section === 'support' && supportTickets.filter(ticket => ticket.status !== 'closed').length === 0 ? (
         <div className="all-reviewed"><Check size={16} /> {'All support tickets have been resolved.'}</div>
       ) : null}
     </div>
@@ -419,22 +432,22 @@ function getSectionMetrics(section: AdminSection, rows: Row[]): ManagementMetric
     case 'shifts':
       return [
         { label: 'Total shifts', value: String(rows.length), attention: false },
-        { label: 'Live now', value: String(rows.filter(row => row.subtitle.toLowerCase().startsWith('live')).length), attention: false },
-        { label: 'Finding workers', value: String(count('finding', 'partially filled')), attention: true },
-        { label: 'Completed', value: String(count('completed', 'staffed')), attention: false },
+        { label: 'Live requests active', value: String(rows.filter(row => row.subtitle.startsWith('Live') && matchesStatus(row.status, 'searching', 'open', 'filled', 'in progress')).length), attention: false },
+        { label: 'Finding workers', value: String(count('searching', 'open')), attention: true },
+        { label: 'Completed', value: String(count('completed')), attention: false },
       ];
     case 'payments':
       return [
         { label: 'Transactions', value: String(rows.length), attention: false },
-        { label: 'Paid', value: String(count('paid')), attention: false },
+        { label: 'Succeeded', value: String(count('succeeded')), attention: false },
         { label: 'Pending', value: String(count('pending')), attention: true },
-        { label: 'Failed / refunded', value: String(count('failed', 'refunded')), attention: false },
+        { label: 'Failed / expired / cancelled', value: String(count('failed', 'expired', 'cancelled')), attention: false },
       ];
     case 'payouts':
       return [
         { label: 'Withdrawal requests', value: String(rows.length), attention: false },
-        { label: 'Completed', value: String(count('completed')), attention: false },
-        { label: 'Awaiting processing', value: String(count('pending', 'processing')), attention: true },
+        { label: 'Paid', value: String(count('paid')), attention: false },
+        { label: 'In flight', value: String(count('initiated', 'processing')), attention: true },
         { label: 'Failed', value: String(count('failed')), attention: false },
       ];
     case 'support':
@@ -442,7 +455,7 @@ function getSectionMetrics(section: AdminSection, rows: Row[]): ManagementMetric
         { label: 'Total tickets', value: String(rows.length), attention: false },
         { label: 'Open', value: String(count('open')), attention: true },
         { label: 'In progress', value: String(count('in progress')), attention: false },
-        { label: 'Resolved', value: String(count('resolved')), attention: false },
+        { label: 'Closed', value: String(count('closed')), attention: false },
       ];
     case 'approvals':
       return [];
@@ -546,6 +559,11 @@ function getRows(
     }));
   }
 
+  const dateTime = (value: string) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  const timeOnly = (value: string) =>
+    new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(value));
+
   if (section === 'shifts') {
     return shifts.map((shift, index) => ({
       id: shift.id,
@@ -553,20 +571,23 @@ function getRows(
       subtitle: `${titleCase(shift.kind)} · ${shift.area}`,
       avatar: initialsOf(shift.businessName),
       avatarTone: index % 5,
-      cells: [shift.businessName, `${dateLabel(shift.date, locale)} · ${shift.startTime}`, `${shift.assignments.length} / ${shift.workersNeeded}`, `${formatRupees(shift.hourlyRate)} / hr`],
+      cells: [shift.businessName, `${dateLabel(shift.startsAt, locale)} · ${timeOnly(shift.startsAt)}`, `${shift.assignedCount} / ${shift.workersNeeded}`, `${formatMinorRupees(shift.hourlyRateMinor)} / hr`],
       status: titleCase(shift.status),
-      statusTone: statusTone(shift.status),
+      statusTone: statusTone(titleCase(shift.status)),
       detailType: 'record',
       details: [
         { label: 'Business', value: shift.businessName },
-        { label: 'Category', value: titleCase(shift.category) },
+        { label: 'Type', value: titleCase(shift.kind) },
         { label: 'Location', value: shift.area },
-        { label: 'Date and time', value: `${dateLabel(shift.date, locale)} · ${shift.startTime}–${shift.endTime}` },
-        { label: 'Workers', value: `${shift.assignments.length} assigned of ${shift.workersNeeded}` },
-        { label: 'Hourly rate', value: `${formatRupees(shift.hourlyRate)} / hr` },
-        { label: 'Applicants', value: String(shift.applicants) },
-        { label: 'Requirements', value: shift.requirement },
-        { label: 'Responsibilities', value: shift.responsibilities },
+        { label: 'Starts', value: dateTime(shift.startsAt) },
+        { label: 'Ends', value: dateTime(shift.endsAt) },
+        { label: 'Workers', value: `${shift.assignedCount} assigned of ${shift.workersNeeded}` },
+        { label: 'Hourly rate', value: `${formatMinorRupees(shift.hourlyRateMinor)} / hr` },
+        ...(shift.searchRadiusKm === null ? [] : [{ label: 'Search radius', value: `${shift.searchRadiusKm} km` }]),
+        { label: 'Requirements', value: shift.requirement || 'None' },
+        { label: 'Responsibilities', value: shift.responsibilities || 'None' },
+        { label: 'Created', value: dateTime(shift.createdAt) },
+        ...(shift.cancelReason ? [{ label: 'Cancel reason', value: shift.cancelReason }] : []),
       ],
     }));
   }
@@ -575,23 +596,25 @@ function getRows(
     return payments.map((payment, index) => ({
       id: payment.id,
       title: payment.reference,
-      subtitle: `${payment.workers} worker${payment.workers === 1 ? '' : 's'} · ${payment.role}`,
+      subtitle: payment.invoiceReference ? `Invoice ${payment.invoiceReference}` : payment.provider,
       avatar: '₹',
       avatarTone: index % 5,
-      cells: [payment.businessName, dateLabel(payment.createdAt, locale), titleCase(payment.method), formatRupees(payment.amount)],
+      cells: [payment.businessName, dateLabel(payment.createdAt, locale), titleCase(payment.method), formatMinorRupees(payment.amountMinor)],
       status: titleCase(payment.status),
       statusTone: statusTone(payment.status),
       detailType: 'record',
       details: [
         { label: 'Business', value: payment.businessName },
-        { label: 'Shift', value: `${payment.shiftId} · ${payment.role}` },
-        { label: 'Workers', value: String(payment.workers) },
-        { label: 'Subtotal', value: formatRupees(payment.subtotal) },
-        { label: 'Platform fee', value: formatRupees(payment.platformFee) },
-        { label: 'Total amount', value: formatRupees(payment.amount) },
+        { label: 'Invoice', value: payment.invoiceReference ?? payment.invoiceId },
+        { label: 'Worker subtotal', value: payment.subtotalMinor === null ? 'Unavailable' : formatMinorRupees(payment.subtotalMinor) },
+        { label: 'Platform fee', value: payment.platformFeeMinor === null ? 'Unavailable' : formatMinorRupees(payment.platformFeeMinor) },
+        { label: 'Amount charged', value: formatMinorRupees(payment.amountMinor) },
         { label: 'Method', value: titleCase(payment.method) },
-        { label: 'Date', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(payment.createdAt)) },
+        { label: 'Provider', value: payment.provider },
+        { label: 'Created', value: dateTime(payment.createdAt) },
+        { label: 'Paid at', value: payment.paidAt ? dateTime(payment.paidAt) : 'Not paid' },
         { label: 'Status', value: titleCase(payment.status) },
+        ...(payment.failureReason ? [{ label: 'Failure reason', value: payment.failureReason }] : []),
       ],
     }));
   }
@@ -603,7 +626,7 @@ function getRows(
       subtitle: payout.reference,
       avatar: initialsOf(payout.workerName),
       avatarTone: index % 5,
-      cells: [payout.method, dateLabel(payout.requestedAt, locale), formatRupees(payout.amount)],
+      cells: [payout.method, dateLabel(payout.requestedAt, locale), formatMinorRupees(payout.amountMinor)],
       status: titleCase(payout.status),
       statusTone: statusTone(payout.status),
       detailType: 'record',
@@ -611,10 +634,13 @@ function getRows(
         { label: 'Worker', value: `${payout.workerName} (${payout.workerId})` },
         { label: 'Reference', value: payout.reference },
         { label: 'Method', value: payout.method },
-        { label: 'Destination', value: payout.destination },
-        { label: 'Requested at', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(payout.requestedAt)) },
-        { label: 'Amount', value: formatRupees(payout.amount) },
+        { label: 'Destination', value: payout.destination || 'Unavailable' },
+        { label: 'Provider', value: payout.provider },
+        { label: 'Requested at', value: dateTime(payout.requestedAt) },
+        { label: 'Completed at', value: payout.completedAt ? dateTime(payout.completedAt) : 'Not completed' },
+        { label: 'Amount', value: formatMinorRupees(payout.amountMinor) },
         { label: 'Status', value: titleCase(payout.status) },
+        ...(payout.failureReason ? [{ label: 'Failure reason', value: payout.failureReason }] : []),
       ],
     }));
   }
@@ -623,21 +649,23 @@ function getRows(
     return supportTickets.map((ticket, index) => ({
       id: ticket.id,
       title: ticket.subject,
-      subtitle: `${ticket.raisedBy.name} · ${ticket.category}`,
+      subtitle: `${ticket.raisedBy.name} · ${titleCase(ticket.topic)}`,
       avatar: initialsOf(ticket.raisedBy.name),
       avatarTone: index % 5,
-      cells: [ticket.raisedBy.name, titleCase(ticket.category), titleCase(ticket.priority)],
+      cells: [ticket.raisedBy.name, titleCase(ticket.topic), titleCase(ticket.priority)],
       status: titleCase(ticket.status),
-      statusTone: statusTone(ticket.status),
+      statusTone: statusTone(titleCase(ticket.status)),
       detailType: 'record',
       details: [
-        { label: 'Raised by', value: `${ticket.raisedBy.name} (${titleCase(ticket.raisedBy.role)})` },
-        { label: 'Category', value: titleCase(ticket.category) },
+        { label: 'Raised by', value: ticket.raisedBy.phone ? `${ticket.raisedBy.name} (${ticket.raisedBy.phone})` : ticket.raisedBy.name },
+        { label: 'Topic', value: titleCase(ticket.topic) },
         { label: 'Priority', value: titleCase(ticket.priority) },
         { label: 'Status', value: titleCase(ticket.status) },
-        { label: 'Created', value: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ticket.createdAt)) },
+        { label: 'Created', value: dateTime(ticket.createdAt) },
+        { label: 'Updated', value: dateTime(ticket.updatedAt) },
         { label: 'Message', value: ticket.message },
         { label: 'Shift', value: ticket.shiftId ?? 'Not linked' },
+        ...(ticket.resolutionNote ? [{ label: 'Resolution note', value: ticket.resolutionNote }] : []),
       ],
     }));
   }

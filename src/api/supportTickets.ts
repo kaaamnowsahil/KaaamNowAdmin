@@ -1,8 +1,5 @@
-import {
-  getRecord,
-  listAllRecords,
-  updateRecord,
-} from './adminResources';
+import { getRecord, listAllRecords } from './adminResources';
+import { apiRequest } from './client';
 
 export type TicketStatus = 'open' | 'in_progress' | 'closed';
 export type TicketPriority = 'normal' | 'urgent';
@@ -50,12 +47,20 @@ export function getSupportTickets(
   );
 }
 
-export function updateSupportTicket(
+/**
+ * Starts or closes a ticket. The server stamps `resolved_at` and the acting admin; repeating
+ * the current status returns the ticket unchanged.
+ */
+export function setSupportTicketStatus(
   token: string,
   id: string,
-  body: Partial<Pick<SupportTicketRecord, 'status' | 'resolution_note' | 'resolved_at'>>,
+  body: { status: 'in_progress' | 'closed'; resolution_note?: string | null },
 ): Promise<SupportTicketRecord> {
-  return updateRecord<SupportTicketRecord>(token, 'support_tickets', id, body);
+  return apiRequest<SupportTicketRecord>(
+    `/api/v1/admin/support-tickets/${encodeURIComponent(id)}/status`,
+    token,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
 }
 
 /** Missing or unreadable users resolve to null instead of failing the whole batch. */

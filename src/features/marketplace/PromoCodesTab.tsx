@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useState } from 'react';
 import {
   createPromoCode,
   getPromoCodes,
+  isShiftCoupon,
   setPromoCodeActive,
   type PromoCode,
   type PromoCodeInput,
@@ -10,46 +11,91 @@ import {
 
 import { formatDate, rupees, useAdminList, type TabProps } from './shared';
 
-const EMPTY: PromoCodeInput = {
+export type PromoForm = PromoCodeInput & { capRupees: string; minRupees: string };
+
+const EMPTY: PromoForm = {
   code: '',
+  title: '',
   target_role: 'business',
+  booking_types: 'all',
   discount_type: 'waive_fees',
   discount_value: 0,
   applies_to: 'all_fees',
   max_discount_minor: null,
+  min_booking_minor: null,
   valid_until: null,
   max_uses: null,
   max_uses_per_user: 1,
+  is_listed: false,
+  capRupees: '',
+  minRupees: '',
 };
 
-function discountLabel(promo: PromoCode) {
-  if (promo.discount_type === 'waive_fees') return `Waive ${promo.applies_to.replace('_', ' ')}`;
-  if (promo.discount_type === 'percent') return `${Number(promo.discount_value)}% off ${promo.applies_to}`;
-  return `${rupees(Number(promo.discount_value) * 100)} off ${promo.applies_to}`;
+const SHIFT_EMPTY: PromoForm = { ...EMPTY, booking_types: 'shift' };
+
+const APPLIES_TO_LABEL: Record<PromoCode['applies_to'], string> = {
+  all_fees: 'commission + transaction charge',
+  commission: 'commission',
+  gateway: 'transaction charge',
+};
+
+const BOOKING_LABEL: Record<PromoCode['booking_types'], string> = {
+  all: 'Shift + Live Work',
+  shift: 'Shift',
+  live: 'Live Work',
+};
+
+const toMinor = (rupeesText: string) => (rupeesText.trim() ? Math.round(Number(rupeesText) * 100) : null);
+
+/** Request body for a new code; worker codes discount payouts, so booking targeting is ignored. */
+export function buildPromoInput(form: PromoForm): PromoCodeInput {
+  const forBusiness = form.target_role === 'business';
+  return {
+    code: form.code.trim().toUpperCase(),
+    title: form.title.trim(),
+    target_role: form.target_role,
+    booking_types: forBusiness ? form.booking_types : 'all',
+    discount_type: form.discount_type,
+    discount_value: form.discount_type === 'waive_fees' ? 0 : Number(form.discount_value),
+    applies_to: form.applies_to,
+    max_discount_minor: toMinor(form.capRupees),
+    min_booking_minor: forBusiness ? toMinor(form.minRupees) : null,
+    valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : null,
+    max_uses: form.max_uses,
+    max_uses_per_user: form.max_uses_per_user,
+    is_listed: forBusiness && form.is_listed,
+  };
 }
 
-export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
-  const load = useCallback(() => getPromoCodes(token), [token]);
+function discountLabel(promo: PromoCode) {
+  const target = APPLIES_TO_LABEL[promo.applies_to];
+  if (promo.discount_type === 'waive_fees') return `Waive ${target}`;
+  if (promo.discount_type === 'percent') return `${Number(promo.discount_value)}% off ${target}`;
+  return `${rupees(Number(promo.discount_value) * 100)} off ${target}`;
+}
+
+type PromoCodesTabProps = TabProps & {
+  /** `shift`: only Business coupons usable on Shift bookings. */
+  scope?: 'all' | 'shift';
+};
+
+export function PromoCodesTab({ token, onSessionExpired, scope = 'all' }: PromoCodesTabProps) {
+  const isShift = scope === 'shift';
+  const blank = isShift ? SHIFT_EMPTY : EMPTY;
+  const load = useCallback(
+    async () => (await getPromoCodes(token)).filter((promo) => !isShift || isShiftCoupon(promo)),
+    [isShift, token],
+  );
   const list = useAdminList(load, onSessionExpired);
-  const [form, setForm] = useState<PromoCodeInput>(EMPTY);
-  const [capRupees, setCapRupees] = useState('');
-  const set = <K extends keyof PromoCodeInput>(key: K, value: PromoCodeInput[K]) =>
+  const [form, setForm] = useState<PromoForm>(blank);
+  const set = <K extends keyof PromoForm>(key: K, value: PromoForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
+  const forBusiness = form.target_role === 'business';
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const created = await list.run(() =>
-      createPromoCode(token, {
-        ...form,
-        code: form.code.trim().toUpperCase(),
-        discount_value: form.discount_type === 'waive_fees' ? 0 : Number(form.discount_value),
-        max_discount_minor: capRupees ? Math.round(Number(capRupees) * 100) : null,
-        valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : null,
-      }),
-    );
-    if (created) {
-      setForm(EMPTY);
-      setCapRupees('');
+    if (await list.run(() => createPromoCode(token, buildPromoInput(form)))) {
+      setForm(blank);
       void list.reload();
     }
   };
@@ -65,36 +111,52 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <h2>New promo code</h2>
-            <p>Business codes discount fees on a posting; worker codes apply to the next payout.</p>
+            <h2>{isShift ? 'New Shift coupon' : 'New promo code'}</h2>
+            <p>
+              {isShift
+                ? 'Businesses apply these at Shift checkout. Coupons only reduce platform fees (commission and transaction charge), never worker pay or tax.'
+                : 'Business codes discount fees on a booking; worker codes apply to the next payout.'}
+            </p>
           </div>
         </div>
         <form className="hold-form" onSubmit={(event) => void submit(event)}>
           <label>
             Code
-            <input
-              maxLength={32}
-              onChange={(event) => set('code', event.target.value)}
-              required
-              value={form.code}
-            />
+            <input maxLength={32} onChange={(event) => set('code', event.target.value)} required value={form.code} />
           </label>
           <label>
-            For
-            <select
-              onChange={(event) => set('target_role', event.target.value as PromoCode['target_role'])}
-              value={form.target_role}
-            >
-              <option value="business">Business / Work</option>
-              <option value="worker">Worker</option>
-            </select>
+            Title <span className="field-hint">(shown to Businesses)</span>
+            <input maxLength={80} onChange={(event) => set('title', event.target.value)} value={form.title} />
           </label>
+          {!isShift && (
+            <label>
+              For
+              <select
+                onChange={(event) => set('target_role', event.target.value as PromoCode['target_role'])}
+                value={form.target_role}
+              >
+                <option value="business">Business / Work</option>
+                <option value="worker">Worker</option>
+              </select>
+            </label>
+          )}
+          {forBusiness && (
+            <label>
+              Bookings
+              <select
+                onChange={(event) => set('booking_types', event.target.value as PromoCode['booking_types'])}
+                value={form.booking_types}
+              >
+                <option value="shift">Shift only</option>
+                <option value="all">Shift + Live Work</option>
+                {!isShift && <option value="live">Live Work only</option>}
+              </select>
+            </label>
+          )}
           <label>
             Discount
             <select
-              onChange={(event) =>
-                set('discount_type', event.target.value as PromoCode['discount_type'])
-              }
+              onChange={(event) => set('discount_type', event.target.value as PromoCode['discount_type'])}
               value={form.discount_type}
             >
               <option value="waive_fees">Waive fees</option>
@@ -122,20 +184,21 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
               onChange={(event) => set('applies_to', event.target.value as PromoCode['applies_to'])}
               value={form.applies_to}
             >
-              <option value="all_fees">All fees</option>
+              <option value="all_fees">Commission + transaction charge</option>
               <option value="commission">Commission only</option>
-              <option value="gateway">Gateway fee only</option>
+              <option value="gateway">Transaction charge only</option>
             </select>
           </label>
           <label>
             Max discount (₹) <span className="field-hint">(optional)</span>
-            <input
-              min={0}
-              onChange={(event) => setCapRupees(event.target.value)}
-              type="number"
-              value={capRupees}
-            />
+            <input min={0} onChange={(event) => set('capRupees', event.target.value)} type="number" value={form.capRupees} />
           </label>
+          {forBusiness && (
+            <label>
+              Minimum worker pay (₹) <span className="field-hint">(optional)</span>
+              <input min={0} onChange={(event) => set('minRupees', event.target.value)} type="number" value={form.minRupees} />
+            </label>
+          )}
           <label>
             Valid until <span className="field-hint">(optional)</span>
             <input
@@ -148,9 +211,7 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
             Total uses <span className="field-hint">(blank = unlimited)</span>
             <input
               min={1}
-              onChange={(event) =>
-                set('max_uses', event.target.value ? Number(event.target.value) : null)
-              }
+              onChange={(event) => set('max_uses', event.target.value ? Number(event.target.value) : null)}
               type="number"
               value={form.max_uses ?? ''}
             />
@@ -164,6 +225,12 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
               value={form.max_uses_per_user}
             />
           </label>
+          {forBusiness && (
+            <label className="checkbox-row">
+              <input checked={form.is_listed} onChange={(event) => set('is_listed', event.target.checked)} type="checkbox" />
+              Show on the Business Promotions screen
+            </label>
+          )}
           <button className="primary-button" disabled={list.busy || !form.code.trim()} type="submit">
             Create code
           </button>
@@ -178,11 +245,14 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
             <thead>
               <tr>
                 <th>CODE</th>
-                <th>FOR</th>
+                {!isShift && <th>FOR</th>}
+                <th>BOOKINGS</th>
                 <th>DISCOUNT</th>
                 <th>CAP</th>
+                <th>MIN PAY</th>
                 <th>USED</th>
                 <th>VALID UNTIL</th>
+                <th>LISTED</th>
                 <th>SOURCE</th>
                 <th />
               </tr>
@@ -190,12 +260,18 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
             <tbody>
               {list.items.map((promo) => (
                 <tr key={promo.id}>
-                  <td className="table-primary-cell">{promo.code}</td>
-                  <td>{promo.target_role}</td>
+                  <td className="table-primary-cell">
+                    {promo.code}
+                    {promo.title ? <small className="muted-copy"> · {promo.title}</small> : null}
+                  </td>
+                  {!isShift && <td>{promo.target_role}</td>}
+                  <td>{promo.target_role === 'business' ? BOOKING_LABEL[promo.booking_types] : 'Payout'}</td>
                   <td>{discountLabel(promo)}</td>
                   <td>{rupees(promo.max_discount_minor)}</td>
+                  <td>{rupees(promo.min_booking_minor)}</td>
                   <td>{`${promo.used_count}${promo.max_uses ? ` / ${promo.max_uses}` : ''}`}</td>
                   <td>{formatDate(promo.valid_until)}</td>
+                  <td>{promo.is_listed ? 'Yes' : promo.owner_user_id ? 'One business' : '—'}</td>
                   <td>{promo.source}</td>
                   <td>
                     <button
@@ -211,7 +287,9 @@ export function PromoCodesTab({ token, onSessionExpired }: TabProps) {
               ))}
             </tbody>
           </table>
-          {!list.busy && list.items.length === 0 ? <p className="empty-state">No promo codes yet.</p> : null}
+          {!list.busy && list.items.length === 0 ? (
+            <p className="empty-state">{isShift ? 'No Shift coupons yet.' : 'No promo codes yet.'}</p>
+          ) : null}
         </div>
       </section>
     </div>
