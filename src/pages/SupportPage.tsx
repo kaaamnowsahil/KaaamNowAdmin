@@ -16,8 +16,12 @@ type SupportPageProps = {
   approvals: AdminVerificationRequest[];
   search: string;
   onSearch: (value: string) => void;
+  statusFilter: string;
+  onStatusFilterChange: (status: string) => void;
   onSelect: (record: SelectedRecord) => void;
   onResolveTicket: (ticketId: string) => void;
+  busyTicketId?: string;
+  serverTotal?: number;
 };
 
 export function SupportPage({
@@ -28,8 +32,12 @@ export function SupportPage({
   approvals,
   search,
   onSearch,
+  statusFilter,
+  onStatusFilterChange,
   onSelect,
   onResolveTicket,
+  busyTicketId,
+  serverTotal,
 }: SupportPageProps) {
   return (
     <ManagementPage
@@ -42,8 +50,12 @@ export function SupportPage({
       approvals={approvals}
       search={search}
       onSearch={onSearch}
+      statusFilter={statusFilter}
+      onStatusFilterChange={onStatusFilterChange}
       onSelect={onSelect}
       onResolveTicket={onResolveTicket}
+      busyTicketId={busyTicketId}
+      serverTotal={serverTotal}
     />
   );
 }

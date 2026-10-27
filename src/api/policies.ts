@@ -47,7 +47,11 @@ export type PlatformFeePolicy = {
   /** Business commission %. */
   percentage: Numeric;
   worker_percentage: Numeric;
+  /** Transaction (payment gateway) charge % on worker pay + commission. */
   gateway_percentage: Numeric;
+  tax_percentage: Numeric;
+  tax_label: string;
+  tax_base: 'subtotal' | 'base_amount' | 'commission';
   is_active: boolean;
   notes: string;
   created_at: string;

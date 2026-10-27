@@ -14,6 +14,15 @@ export const formatIndianPhone = (e164: string): string => {
 export const formatRupees = (amount: number): string =>
   `₹${Math.round(amount).toLocaleString('en-IN')}`;
 
+/** Paise to rupees, keeping paise when present: 105050 -> "₹1,050.50", 105000 -> "₹1,050". */
+export const formatMinorRupees = (minor: number): string => {
+  const digits = minor % 100 === 0 ? 0 : 2;
+  return `₹${(minor / 100).toLocaleString('en-IN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+};
+
 /** 125000 -> "₹1.3L", 2400000 -> "₹24L" */
 export const formatCompactRupees = (amount: number): string => {
   if (amount >= 1_00_00_000) {

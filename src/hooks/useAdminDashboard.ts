@@ -1,13 +1,17 @@
-import { formatText } from '@/utils/text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import {
-  payments as initialPayments,
-  payouts as initialPayouts,
-  shifts as initialShifts,
-  supportTickets as initialSupportTickets,
-} from '@/data/mockData';
 import { ApiError } from '@/api/client';
+import {
+  mapPayments,
+  mapPayouts,
+  mapShifts,
+  mapSupportTickets,
+  type MarketplaceRecords,
+} from '@/api/marketplaceMappers';
+import { loadMarketplaceRecords, type MarketplaceTotals } from '@/api/marketplaceRecords';
+import { getMetricsOverview, type AdminMetricsOverview } from '@/api/metrics';
+import { setSupportTicketStatus } from '@/api/supportTickets';
+import { ALL_STATUSES } from '@/constants/quickFilters';
 import { getAdminUserStatus, setAdminUserActive } from '@/api/adminUsers';
 import {
   getBusinesses,
@@ -16,7 +20,7 @@ import {
 } from '@/api/businesses';
 import { getWorkers, mapWorkerProfile, verifyWorker } from '@/api/workers';
 import type { SelectedRecord } from '@/pages/ManagementPage';
-import type { AdminVerificationRequest, Business, PayoutStatus, Worker } from '@/types';
+import type { AdminVerificationRequest, Business, Worker } from '@/types';
 
 function requireUserActiveStatus(statuses: Map<string, boolean>, userId: string) {
   const isActive = statuses.get(userId);
@@ -28,6 +32,7 @@ function requireUserActiveStatus(statuses: Map<string, boolean>, userId: string)
 
 export function useAdminDashboard(accessToken: string, onSessionExpired: () => void) {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState(ALL_STATUSES);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [workersLoading, setWorkersLoading] = useState(true);
   const [workersError, setWorkersError] = useState('');
@@ -37,9 +42,14 @@ export function useAdminDashboard(accessToken: string, onSessionExpired: () => v
   const [directoryActionError, setDirectoryActionError] = useState('');
   const [busyDirectoryId, setBusyDirectoryId] = useState('');
   const [busyVerificationDecision, setBusyVerificationDecision] = useState<'verified' | 'rejected' | ''>('');
-  const [paymentRows] = useState(initialPayments);
-  const [payoutRows, setPayoutRows] = useState(initialPayouts);
-  const [supportTickets, setSupportTickets] = useState(initialSupportTickets);
+  const [records, setRecords] = useState<MarketplaceRecords | null>(null);
+  const [recordTotals, setRecordTotals] = useState<MarketplaceTotals | null>(null);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [recordsError, setRecordsError] = useState('');
+  const [metrics, setMetrics] = useState<AdminMetricsOverview | null>(null);
+  const [metricsError, setMetricsError] = useState('');
+  const [busyTicketId, setBusyTicketId] = useState('');
+  const [ticketError, setTicketError] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<SelectedRecord | null>(null);
   const [toast, setToast] = useState('');
 
@@ -80,6 +90,55 @@ export function useAdminDashboard(accessToken: string, onSessionExpired: () => v
       setBusinessesLoading(false);
     }
   }, [accessToken, onSessionExpired]);
+
+  const loadRecords = useCallback(async () => {
+    setRecordsLoading(true);
+    setRecordsError('');
+    setMetricsError('');
+    const failureMessage = (cause: unknown, fallback: string) => {
+      if (cause instanceof ApiError && cause.status === 401) {
+        onSessionExpired();
+        return '';
+      }
+      return cause instanceof Error ? cause.message : fallback;
+    };
+    const [loaded, overview] = await Promise.allSettled([
+      loadMarketplaceRecords(accessToken),
+      getMetricsOverview(accessToken),
+    ]);
+    if (loaded.status === 'fulfilled') {
+      setRecords(loaded.value.records);
+      setRecordTotals(loaded.value.totals);
+    } else {
+      setRecords(null);
+      setRecordTotals(null);
+      setRecordsError(failureMessage(loaded.reason, 'Could not load marketplace records.'));
+    }
+    if (overview.status === 'fulfilled') {
+      setMetrics(overview.value);
+    } else {
+      setMetrics(null);
+      setMetricsError(failureMessage(overview.reason, 'Could not load dashboard metrics.'));
+    }
+    setRecordsLoading(false);
+  }, [accessToken, onSessionExpired]);
+
+  const shifts = useMemo(
+    () => (records ? mapShifts(records.shifts, records.assignments, businesses) : []),
+    [records, businesses],
+  );
+  const paymentRows = useMemo(
+    () => (records ? mapPayments(records.payments, records.invoices, businesses) : []),
+    [records, businesses],
+  );
+  const payoutRows = useMemo(
+    () => (records ? mapPayouts(records.withdrawals, records.payoutAccounts, workers) : []),
+    [records, workers],
+  );
+  const supportTickets = useMemo(
+    () => (records ? mapSupportTickets(records.supportTickets, records.users) : []),
+    [records],
+  );
 
   const pendingApprovals = useMemo<AdminVerificationRequest[]>(() => [
     ...workers
@@ -133,6 +192,10 @@ export function useAdminDashboard(accessToken: string, onSessionExpired: () => v
   useEffect(() => {
     void loadDirectory();
   }, [loadDirectory]);
+
+  useEffect(() => {
+    void loadRecords();
+  }, [loadRecords]);
 
   const verifyProfile = useCallback(async (
     type: 'worker' | 'business',
@@ -206,52 +269,37 @@ export function useAdminDashboard(accessToken: string, onSessionExpired: () => v
     }
   }, [accessToken, onSessionExpired]);
 
-  const updatePayout = (id: string, status: PayoutStatus) => {
-    const payout = payoutRows.find(item => item.id === id);
-    if (!payout) return;
-
-    const allowedNextStatus: Partial<Record<PayoutStatus, PayoutStatus>> = {
-      pending: 'processing',
-      processing: 'completed',
-    };
-    if (allowedNextStatus[payout.status] !== status) return;
-
-    setPayoutRows(current =>
-      current.map(item =>
-        item.id === id
-          ? {
-              ...item,
-              status,
-              processedAt:
-                status === 'completed' ? new Date().toISOString() : item.processedAt,
-            }
-          : item,
-      ),
-    );
-    const localizedStatus = status.charAt(0).toUpperCase() + status.slice(1);
-    setToast(formatText('Payout {{reference}} marked {{status}}.', {
-      reference: payout.reference,
-      status: localizedStatus,
-    }));
+  const showToast = (message: string) => {
+    setToast(message);
     window.setTimeout(() => setToast(''), 3200);
   };
 
-  const resolveTicket = (ticketId: string) => {
-    const ticket = supportTickets.find(item => item.id === ticketId);
-    if (!ticket || ticket.status === 'resolved') return;
-    setSupportTickets(current =>
-      current.map(item =>
-        item.id === ticketId
-          ? { ...item, status: 'resolved', updatedAt: new Date().toISOString() }
-          : item,
-      ),
-    );
-    setToast('Support ticket resolved.');
-    window.setTimeout(() => setToast(''), 3200);
+  const resolveTicket = async (ticketId: string) => {
+    const ticket = records?.supportTickets.find(item => item.id === ticketId);
+    if (!ticket || ticket.status === 'closed' || busyTicketId) return;
+    setBusyTicketId(ticketId);
+    setTicketError('');
+    try {
+      const saved = await setSupportTicketStatus(accessToken, ticketId, { status: 'closed' });
+      setRecords(current => current && {
+        ...current,
+        supportTickets: current.supportTickets.map(item => (item.id === saved.id ? saved : item)),
+      });
+      showToast('Support ticket closed.');
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        onSessionExpired();
+      } else {
+        setTicketError(cause instanceof Error ? cause.message : 'Could not close the support ticket.');
+      }
+    } finally {
+      setBusyTicketId('');
+    }
   };
 
   const resetSelection = () => {
     setSearch('');
+    setStatusFilter(ALL_STATUSES);
     setSelectedRecord(null);
   };
 
@@ -268,16 +316,25 @@ export function useAdminDashboard(accessToken: string, onSessionExpired: () => v
     pendingApprovals: pendingApprovals.length,
     payoutRows,
     resolveTicket,
+    busyTicketId,
+    ticketError,
+    metrics,
+    metricsError,
+    recordTotals,
+    recordsError,
+    recordsLoading,
+    reloadRecords: loadRecords,
     directoryLoading: workersLoading || businessesLoading,
     verifyProfile,
     search,
+    statusFilter,
+    setStatusFilter,
     selectedRecord,
     setSearch,
     setSelectedRecord,
     setToast,
     supportTickets,
     toast,
-    updatePayout,
     workers,
     workersError,
     workersLoading,
@@ -285,6 +342,6 @@ export function useAdminDashboard(accessToken: string, onSessionExpired: () => v
     reloadBusinesses: loadDirectory,
     reloadDirectory: loadDirectory,
     setUserSuspended,
-    shifts: initialShifts,
+    shifts,
   };
 }

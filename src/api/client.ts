@@ -2,9 +2,20 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
+    public readonly code?: string,
+    public readonly details?: unknown,
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
+  }
+
+  /** Per-field messages from `details.fields`, when the server sent a field map. */
+  get fieldErrors(): Record<string, string> {
+    const fields = (this.details as { fields?: unknown } | null | undefined)?.fields;
+    return fields && typeof fields === 'object' && !Array.isArray(fields)
+      ? (fields as Record<string, string>)
+      : {};
   }
 }
 
@@ -43,6 +54,9 @@ export async function apiRequest<T>(
         message?: string;
         detail?: string | { message?: string };
         error?: string;
+        code?: string;
+        details?: unknown;
+        request_id?: string;
       }
     | null;
   if (!response.ok) {
@@ -50,6 +64,9 @@ export async function apiRequest<T>(
     throw new ApiError(
       body?.message ?? detail ?? body?.error ?? `Request failed (${response.status}).`,
       response.status,
+      body?.code,
+      body?.details,
+      body?.request_id ?? response.headers.get('x-request-id') ?? undefined,
     );
   }
   return body as T;

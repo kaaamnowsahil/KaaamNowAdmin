@@ -16,6 +16,13 @@ export type PromoCode = {
   owner_user_id: string | null;
   source: 'admin' | 'system';
   is_active: boolean;
+  /** Which bookings the coupon can be applied to. */
+  booking_types: 'all' | 'shift' | 'live';
+  /** Minimum worker pay (before fees) for the coupon to apply. */
+  min_booking_minor: number | null;
+  /** Shown on the Business Promotions screen. */
+  is_listed: boolean;
+  title: string;
   created_at: string;
 };
 
@@ -30,7 +37,14 @@ export type PromoCodeInput = Pick<
   | 'valid_until'
   | 'max_uses'
   | 'max_uses_per_user'
+  | 'booking_types'
+  | 'min_booking_minor'
+  | 'is_listed'
+  | 'title'
 >;
+
+export const isShiftCoupon = (promo: Pick<PromoCode, 'target_role' | 'booking_types'>) =>
+  promo.target_role === 'business' && (promo.booking_types === 'shift' || promo.booking_types === 'all');
 
 export type TermsAcceptance = {
   id: string;

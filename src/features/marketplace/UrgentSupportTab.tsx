@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getSupportTickets,
   getUserSummaries,
-  updateSupportTicket,
+  setSupportTicketStatus,
   type AdminUserSummary,
   type SupportTicketRecord,
   type TicketStatus,
@@ -42,13 +42,11 @@ export function UrgentSupportTab({
     void load();
   }, [load]);
 
-  const update = async (ticket: SupportTicketRecord, status: TicketStatus) => {
+  const update = async (ticket: SupportTicketRecord, status: 'in_progress' | 'closed') => {
     const done = await run(() =>
-      updateSupportTicket(token, ticket.id, {
+      setSupportTicketStatus(token, ticket.id, {
         status,
-        ...(status === 'closed'
-          ? { resolution_note: notes[ticket.id]?.trim() || null, resolved_at: new Date().toISOString() }
-          : {}),
+        ...(status === 'closed' ? { resolution_note: notes[ticket.id]?.trim() || null } : {}),
       }),
     );
     if (done) void load();

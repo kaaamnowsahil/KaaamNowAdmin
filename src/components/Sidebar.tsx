@@ -51,6 +51,12 @@ const navigation: {
   { id: 'account-deletion', label: 'Account deletion', icon: ShieldAlert },
 ];
 
+const secondaryNavigation: { id: AdminSection; label: string; icon: LucideIcon }[] = [
+  { id: 'activity-log', label: 'Activity log', icon: Activity },
+  { id: 'settings', label: 'Settings', icon: Settings2 },
+  { id: 'help', label: 'Help & support', icon: CircleHelp },
+];
+
 export function Sidebar({
   active,
   pendingApprovals,
@@ -100,18 +106,22 @@ export function Sidebar({
         </nav>
 
         <div className="sidebar-bottom">
-          <button className="sidebar-link">
-            <Activity size={17} />
-            <span>{'Activity log'}</span>
-          </button>
-          <button className="sidebar-link">
-            <Settings2 size={17} />
-            <span>{'Settings'}</span>
-          </button>
-          <button className="sidebar-link">
-            <CircleHelp size={17} />
-            <span>{'Help & support'}</span>
-          </button>
+          {secondaryNavigation.map(item => {
+            const Icon = item.icon;
+            const isActive = active === item.id;
+            return (
+              <button
+                key={item.id}
+                className={`sidebar-link ${isActive ? 'sidebar-link-active' : ''}`}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => onNavigate(item.id)}
+                type="button"
+              >
+                <Icon size={17} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
           <button className="sidebar-user sidebar-signout" onClick={onSignOut}>
             <div className="user-avatar admin-avatar">A</div>
             <div className="user-copy">

@@ -226,13 +226,15 @@ export function ShiftFilterGroup({
                 <td>{displayRange(option, type)}</td>
                 <td>{option.sort_order}</td>
                 <td><StatusBadge tone={option.is_active ? 'success' : 'neutral'}>{option.is_active ? 'Active' : 'Inactive'}</StatusBadge></td>
-                <td className="shift-filter-actions">
-                  <button className="text-button" disabled={busyId === option.id} onClick={() => beginEdit(option)} type="button" aria-label={`Edit ${option.label}`}><Pencil size={14} /> Edit</button>
-                  {option.is_active ? (
-                    <button className="text-button danger-text" disabled={busyId === option.id} onClick={() => void onDeactivate(option)} type="button" aria-label={`Deactivate ${option.label}`}><Trash2 size={14} /> Deactivate</button>
-                  ) : (
-                    <button className="text-button" disabled={busyId === option.id} onClick={() => void onRestore(option)} type="button" aria-label={`Restore ${option.label}`}><RotateCcw size={14} /> Restore</button>
-                  )}
+                <td>
+                  <div className="shift-filter-actions">
+                    <button className="text-button" disabled={busyId === option.id} onClick={() => beginEdit(option)} type="button" aria-label={`Edit ${option.label}`}><Pencil size={14} /> Edit</button>
+                    {option.is_active ? (
+                      <button className="text-button danger-text" disabled={busyId === option.id} onClick={() => void onDeactivate(option)} type="button" aria-label={`Deactivate ${option.label}`}><Trash2 size={14} /> Deactivate</button>
+                    ) : (
+                      <button className="text-button" disabled={busyId === option.id} onClick={() => void onRestore(option)} type="button" aria-label={`Restore ${option.label}`}><RotateCcw size={14} /> Restore</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

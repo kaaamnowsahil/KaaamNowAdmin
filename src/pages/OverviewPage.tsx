@@ -2,81 +2,88 @@ import { formatText } from '@/utils/text';
 import {
   ArrowDownLeft,
   ArrowRight,
-  ArrowUpRight,
   BriefcaseBusiness,
   Building2,
-  ChevronDown,
   CircleDollarSign,
   CircleHelp,
   Clock3,
   Download,
-  MoreHorizontal,
   Plus,
   UsersRound,
 } from 'lucide-react';
 
+import { countFor, type AdminMetricsOverview } from '@/api/metrics';
 import { MetricCard } from '@/components/MetricCard';
 import { ProfileAvatar } from '@/components/ProfileAvatar';
 import { StatusBadge } from '@/components/StatusBadge';
-import type { AdminShift, Business, Payment, Payout, SupportTicket, Worker } from '@/types';
+import type { AdminShift, Payment, Payout, SupportTicket, Worker } from '@/types';
 import { downloadCsv } from '@/utils/csv';
-import { formatCompactRupees, formatCount, formatRupees } from '@/utils/format';
+import { formatCompactRupees, formatCount, formatMinorRupees } from '@/utils/format';
+import { recentActivity, shiftsNeedingWorkers } from './overviewLogic';
 
 type OverviewPageProps = {
   workers: Worker[];
-  businesses: Business[];
   shifts: AdminShift[];
   payments: Payment[];
   payouts: Payout[];
   supportTickets: SupportTicket[];
   pendingApprovals: number;
+  metrics: AdminMetricsOverview | null;
+  metricsError: string;
+  onRetryMetrics: () => void;
   onOpenSection: (section: 'workers' | 'businesses' | 'shifts' | 'payments' | 'payouts' | 'approvals' | 'support') => void;
 };
 
-const activityItems = [
-  { initials: 'TW', tone: 'purple', text: 'Third Wave Coffee posted a live shift', detail: 'Koramangala · 2 min ago' },
-  { initials: 'RD', tone: 'blue', text: 'Rohan Das submitted verification', detail: 'Worker · 18 min ago' },
-  { initials: '₹', tone: 'green', text: 'Payout of ₹1,400 is processing', detail: 'PAY-62179 · 34 min ago' },
-  { initials: 'PE', tone: 'orange', text: 'The Park Events joined KaaamNow', detail: 'Business · 1 hr ago' },
-];
+const UNAVAILABLE = '—';
+
+const greeting = (hour: number) =>
+  hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+const titleCase = (value: string) =>
+  value.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase());
+
+const formatWhen = (iso: string) =>
+  new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
 
 export function OverviewPage({
   workers,
-  businesses,
   shifts,
   payments,
   payouts,
   supportTickets,
   pendingApprovals,
+  metrics,
+  metricsError,
+  onRetryMetrics,
   onOpenSection,
 }: OverviewPageProps) {
-  const verifiedBusinesses = businesses.filter(
-    business => business.verificationStatus === 'verified',
-  ).length;
-  const paidVolume = payments
-    .filter(payment => payment.status === 'paid')
-    .reduce((total, payment) => total + payment.amount, 0);
-  const payoutsInProgress = payouts.filter(payout =>
-    ['pending', 'processing'].includes(payout.status),
-  ).length;
-  const shiftsNeedingWorkers = shifts.filter(
-    shift => shift.assignments.length < shift.workersNeeded,
-  ).length;
-  const openTickets = supportTickets.filter(ticket => ticket.status !== 'resolved').length;
+  const verifiedBusinesses = metrics ? countFor(metrics.businesses_by_verification, 'verified') : null;
+  const understaffed = shiftsNeedingWorkers(shifts).length;
+  const activity = recentActivity({ shifts, payments, payouts, supportTickets }, 5);
+  const shiftStatuses = [...(metrics?.shifts_by_status ?? [])].sort((a, b) => b.count - a.count);
+  const largestStatus = Math.max(1, ...shiftStatuses.map(item => item.count));
+
   const exportReport = () => {
+    if (!metrics) return;
     downloadCsv(
       'kaaamnow-marketplace-overview',
       ['Metric', 'Value'],
       [
-        ['Total workers', workers.length],
-        ['Verified businesses', verifiedBusinesses],
-        ['Business profiles total', businesses.length],
-        ['Shifts in marketplace', shifts.length],
-        ['Shifts needing workers', shiftsNeedingWorkers],
-        ['Paid payment volume', paidVolume],
-        ['Payouts in progress', payoutsInProgress],
+        ['Total users', metrics.users_total],
+        ['Active users', metrics.users_active],
+        ['Total workers', metrics.workers_total],
+        ['Total businesses', metrics.businesses_total],
+        ['Verified businesses', verifiedBusinesses ?? 0],
+        ['Total shifts', metrics.shifts_total],
+        ...metrics.shifts_by_status.map(item => [`Shifts ${item.key}`, item.count] as [string, number]),
+        ['Succeeded payments (INR)', metrics.payments_succeeded_minor / 100],
+        ['Paid invoices (INR)', metrics.invoiced_paid_minor / 100],
+        ['Platform fees on paid invoices (INR)', metrics.platform_fees_minor / 100],
+        ['Withdrawals in flight', metrics.pending_withdrawals],
+        ['Withdrawals in flight (INR)', metrics.pending_withdrawals_minor / 100],
+        ['Paid out to workers (INR)', metrics.total_paid_out_minor / 100],
+        ['Open support tickets', metrics.open_support_tickets],
         ['Pending verifications', pendingApprovals],
-        ['Unresolved support tickets', openTickets],
       ],
     );
   };
@@ -86,11 +93,11 @@ export function OverviewPage({
       <section className="welcome-row">
         <div>
           <p className="eyebrow">{new Intl.DateTimeFormat('en-IN', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date()).toUpperCase()}</p>
-          <h1>{'Good afternoon, Sarah '}<span className="wave">✦</span></h1>
-          <p className="page-description">{'Here’s what’s happening across your marketplace today.'}</p>
+          <h1>{greeting(new Date().getHours())}</h1>
+          <p className="page-description">{'Here’s what’s happening across your marketplace.'}</p>
         </div>
         <div className="welcome-actions">
-          <button className="button button-secondary" onClick={exportReport}>
+          <button className="button button-secondary" onClick={exportReport} disabled={!metrics}>
             <Download size={16} />
             {'Export report'}
           </button>
@@ -102,53 +109,62 @@ export function OverviewPage({
         </div>
       </section>
 
+      {metricsError ? (
+        <div className="inline-error" role="alert">
+          {metricsError}{' '}
+          <button className="text-action" onClick={onRetryMetrics}>{'Retry'}</button>
+        </div>
+      ) : null}
+
       <section className="metric-grid" aria-label={'Marketplace metrics'}>
-        <MetricCard label="Total workers" value={formatCount(workers.length)} note="Worker profiles from the live API" icon={UsersRound} iconTone="tone-purple" />
-        <MetricCard label="Verified businesses" value={formatCount(verifiedBusinesses)} note="of {{count}} live profiles" noteValues={{ count: businesses.length }} icon={Building2} iconTone="tone-blue" />
-        <MetricCard label="Shifts in marketplace" value={formatCount(shifts.length)} note="{{count}} need more workers" noteValues={{ count: shiftsNeedingWorkers }} icon={BriefcaseBusiness} iconTone="tone-orange" />
-        <MetricCard label="Paid payment volume" value={formatCompactRupees(paidVolume)} note="Successful business charges" icon={CircleDollarSign} iconTone="tone-green" />
+        <MetricCard label="Total workers" value={metrics ? formatCount(metrics.workers_total) : UNAVAILABLE} note="Worker profiles in the database" icon={UsersRound} iconTone="tone-purple" />
+        <MetricCard label="Verified businesses" value={verifiedBusinesses === null ? UNAVAILABLE : formatCount(verifiedBusinesses)} note="of {{count}} business profiles" noteValues={{ count: metrics?.businesses_total ?? UNAVAILABLE }} icon={Building2} iconTone="tone-blue" />
+        <MetricCard label="Shifts in marketplace" value={metrics ? formatCount(metrics.shifts_total) : UNAVAILABLE} note="{{count}} open shifts need more workers" noteValues={{ count: understaffed }} icon={BriefcaseBusiness} iconTone="tone-orange" />
+        <MetricCard label="Succeeded payments" value={metrics ? formatCompactRupees(metrics.payments_succeeded_minor / 100) : UNAVAILABLE} note="Provider-confirmed business charges" icon={CircleDollarSign} iconTone="tone-green" />
       </section>
 
       <section className="overview-main-grid">
         <article className="panel chart-panel">
           <div className="panel-heading">
             <div>
-              <h2>{'Marketplace activity'}</h2>
-              <p>{'Shift volume and worker growth over time'}</p>
-            </div>
-            <button className="button button-select">{'Last 30 days'} <ChevronDown size={15} /></button>
-          </div>
-          <div className="chart-summary">
-            <div>
-              <strong>2,408</strong>
-              <span>{'Total shifts posted'}</span>
-            </div>
-            <span className="chart-period"><ArrowUpRight size={14} /> 18.4%</span>
-          </div>
-          <div className="chart-wrap">
-            <div className="chart-y-labels">
-              <span>3k</span><span>2k</span><span>1k</span><span>0</span>
-            </div>
-            <svg className="activity-chart" viewBox="0 0 760 220" role="img" aria-label={'Marketplace shifts trending upward over the last 30 days'}>
-              <defs>
-                <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#8B5CF6" stopOpacity=".2" />
-                  <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {[24, 78, 132, 186].map(y => <line key={y} x1="0" x2="760" y1={y} y2={y} className="chart-gridline" />)}
-              <path d="M0 174 C34 162, 39 143, 70 151 S111 135, 138 145 S177 119, 207 126 S243 133, 276 108 S320 116, 346 99 S389 114, 415 88 S454 102, 483 78 S519 89, 553 66 S590 82, 620 58 S662 66, 691 43 S727 52, 760 28 L760 198 L0 198 Z" fill="url(#chartFill)" />
-              <path d="M0 174 C34 162, 39 143, 70 151 S111 135, 138 145 S177 119, 207 126 S243 133, 276 108 S320 116, 346 99 S389 114, 415 88 S454 102, 483 78 S519 89, 553 66 S590 82, 620 58 S662 66, 691 43 S727 52, 760 28" className="chart-line" />
-              <circle cx="553" cy="66" r="5" className="chart-point" />
-            </svg>
-            <div className="chart-x-labels">
-              <span>{'Sep 21'}</span><span>{'Sep 26'}</span><span>{'Oct 01'}</span><span>{'Oct 06'}</span><span>{'Oct 11'}</span><span>{'Oct 16'}</span><span>{'Oct 20'}</span>
+              <h2>{'Shifts by status'}</h2>
+              <p>{'Current status of every shift in the database'}</p>
             </div>
           </div>
+          {shiftStatuses.length ? (
+            <div className="compact-list">
+              {shiftStatuses.map(item => (
+                <div className="compact-row" key={item.key}>
+                  <span className="compact-primary">
+                    <strong>{titleCase(item.key)}</strong>
+                    <small>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          display: 'block',
+                          height: 6,
+                          borderRadius: 3,
+                          background: '#8B5CF6',
+                          width: `${Math.max(2, (item.count / largestStatus) * 100)}%`,
+                        }}
+                      />
+                    </small>
+                  </span>
+                  <span className="compact-rating">{formatCount(item.count)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">{metrics ? 'No shifts have been posted yet.' : 'Shift metrics are unavailable.'}</p>
+          )}
           <div className="chart-legend">
-            <span><i className="legend-dot purple-dot" /> {'Shifts posted'}</span>
-            <span><i className="legend-dot blue-dot" /> {'Workers onboarded'}</span>
-            <button className="text-action" onClick={() => onOpenSection('shifts')}>{'View shift analytics'} <ArrowRight size={14} /></button>
+            {metrics ? (
+              <span>{formatText('Platform fees on paid invoices: {{fees}} · Paid out to workers: {{paid}}', {
+                fees: formatMinorRupees(metrics.platform_fees_minor),
+                paid: formatMinorRupees(metrics.total_paid_out_minor),
+              })}</span>
+            ) : <span />}
+            <button className="text-action" onClick={() => onOpenSection('shifts')}>{'View shifts'} <ArrowRight size={14} /></button>
           </div>
         </article>
 
@@ -167,21 +183,21 @@ export function OverviewPage({
           </button>
           <button className="attention-item" onClick={() => onOpenSection('payouts')}>
             <span className="attention-icon purple-icon"><ArrowDownLeft size={17} /></span>
-            <span className="attention-copy"><strong>{'Payouts in progress'}</strong><small>{formatText('{{count}} awaiting completion', { count: payoutsInProgress })}</small></span>
+            <span className="attention-copy"><strong>{'Withdrawals in flight'}</strong><small>{metrics ? formatText('{{count}} awaiting the payout provider ({{amount}})', { count: metrics.pending_withdrawals, amount: formatMinorRupees(metrics.pending_withdrawals_minor) }) : UNAVAILABLE}</small></span>
             <ArrowRight size={16} />
           </button>
           <button className="attention-item" onClick={() => onOpenSection('shifts')}>
             <span className="attention-icon blue-icon"><BriefcaseBusiness size={17} /></span>
-            <span className="attention-copy"><strong>{'Shifts needing workers'}</strong><small>{formatText('{{count}} shifts are not fully staffed', { count: shiftsNeedingWorkers })}</small></span>
+            <span className="attention-copy"><strong>{'Shifts needing workers'}</strong><small>{formatText('{{count}} open shifts are not fully staffed', { count: understaffed })}</small></span>
             <ArrowRight size={16} />
           </button>
           <button className="attention-item" onClick={() => onOpenSection('support')}>
             <span className="attention-icon orange-icon"><CircleHelp size={17} /></span>
-            <span className="attention-copy"><strong>{'Support tickets'}</strong><small>{formatText('{{count}} unresolved tickets', { count: openTickets })}</small></span>
+            <span className="attention-copy"><strong>{'Support tickets'}</strong><small>{metrics ? formatText('{{count}} open tickets', { count: metrics.open_support_tickets }) : UNAVAILABLE}</small></span>
             <ArrowRight size={16} />
           </button>
           <div className="attention-footer">
-            <span>{'Updated just now'}</span>
+            <span />
             <button className="text-action" onClick={() => onOpenSection('support')}>{'Open support'} <ArrowRight size={14} /></button>
           </div>
         </article>
@@ -227,19 +243,18 @@ export function OverviewPage({
           <div className="panel-heading">
             <div>
               <h2>{'Recent activity'}</h2>
-              <p>{'Live updates from your marketplace'}</p>
+              <p>{'Newest shifts, payments, withdrawals and tickets'}</p>
             </div>
-            <button className="icon-button" aria-label={'More activity options'}><MoreHorizontal size={19} /></button>
           </div>
           <div className="activity-list">
-            {activityItems.map(item => (
-              <div className="activity-item" key={item.text}>
+            {activity.map(item => (
+              <div className="activity-item" key={`${item.kind}-${item.id}`}>
                 <span className={`activity-avatar activity-${item.tone}`}>{item.initials}</span>
-                <span className="activity-copy"><strong>{item.text}</strong><small>{item.detail}</small></span>
+                <span className="activity-copy"><strong>{item.text}</strong><small>{`${item.detail} · ${formatWhen(item.at)}`}</small></span>
               </div>
             ))}
+            {activity.length === 0 ? <p className="empty-state">No marketplace activity yet.</p> : null}
           </div>
-          <button className="activity-link">{'See all activity'} <ArrowRight size={14} /></button>
         </article>
       </section>
 
@@ -255,11 +270,12 @@ export function OverviewPage({
           {payments.slice(0, 3).map(payment => (
             <div className="payment-summary" key={payment.id}>
               <span className="payment-summary-icon"><CircleDollarSign size={18} /></span>
-              <span><strong>{payment.businessName}</strong><small>{payment.reference} · {payment.role}</small></span>
-              <strong>{formatRupees(payment.amount)}</strong>
-              <StatusBadge tone={payment.status === 'paid' ? 'success' : payment.status === 'pending' ? 'warning' : 'neutral'}>{payment.status}</StatusBadge>
+              <span><strong>{payment.businessName}</strong><small>{payment.reference} · {titleCase(payment.method)}</small></span>
+              <strong>{formatMinorRupees(payment.amountMinor)}</strong>
+              <StatusBadge tone={payment.status === 'succeeded' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger'}>{payment.status}</StatusBadge>
             </div>
           ))}
+          {payments.length === 0 ? <p className="empty-state">No payments yet.</p> : null}
         </div>
       </section>
     </div>
