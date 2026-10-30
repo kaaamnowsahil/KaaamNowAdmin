@@ -15,6 +15,8 @@ const shift = (over: Partial<AdminShift>): AdminShift => ({
   startsAt: '2026-10-27T10:00:00Z',
   endsAt: '2026-10-27T14:00:00Z',
   hourlyRateMinor: 20000,
+  pricingMode: 'hourly',
+  taskPriceMinor: null,
   workersNeeded: 2,
   assignedCount: 0,
   requirement: '',

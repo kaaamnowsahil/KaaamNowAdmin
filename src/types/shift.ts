@@ -23,6 +23,9 @@ export type AdminShift = {
   startsAt: string;
   endsAt: string;
   hourlyRateMinor: number;
+  /** Task: one fixed price per worker, finished with the completion code. */
+  pricingMode: 'hourly' | 'task';
+  taskPriceMinor: number | null;
   workersNeeded: number;
   /** Assignments that are not cancelled or no-show. */
   assignedCount: number;
