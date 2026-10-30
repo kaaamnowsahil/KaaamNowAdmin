@@ -64,6 +64,20 @@ describe('mapShifts', () => {
     });
   });
 
+  it('treats rows without a pricing mode as hourly', () => {
+    const [row] = mapShifts([shift()], [], [business]);
+    expect(row).toMatchObject({ pricingMode: 'hourly', taskPriceMinor: null });
+  });
+
+  it('carries the fixed price of a task shift', () => {
+    const [row] = mapShifts(
+      [shift({ pricing_mode: 'task', task_price_minor: 60000 })],
+      [],
+      [business],
+    );
+    expect(row).toMatchObject({ pricingMode: 'task', taskPriceMinor: 60000 });
+  });
+
   it('never invents a business name or radius', () => {
     const [named] = mapShifts([shift({ business_profile_id: 'x' })], [], []);
     expect(named?.businessName).toBe('Site name');

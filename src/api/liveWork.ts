@@ -4,9 +4,14 @@ const BASE = '/api/v1/admin/live-work';
 
 export type TaxBase = 'subtotal' | 'base_amount' | 'commission';
 
+/** Task: one fixed price, no timer or extensions; finished with the completion code. */
+export type PricingMode = 'hourly' | 'task';
+
 export type LivePriceBreakdown = {
   currency: string;
   settings_version: number;
+  pricing_mode: PricingMode;
+  task_price_minor: number | null;
   hourly_rate_minor: number;
   reserved_minutes: number;
   base_amount_minor: number;
@@ -68,6 +73,8 @@ export type AdminLiveBooking = {
   business_name: string;
   worker_name: string | null;
   assignment_status: string | null;
+  pricing_mode: PricingMode;
+  task_price_minor: number | null;
   reserved_minutes: number;
   total_minor: number;
   commission_minor: number;

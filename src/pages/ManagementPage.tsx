@@ -564,6 +564,11 @@ function getRows(
   const timeOnly = (value: string) =>
     new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(value));
 
+  const shiftPay = (shift: AdminShift) =>
+    shift.pricingMode === 'task'
+      ? `${formatMinorRupees(shift.taskPriceMinor ?? 0)} fixed`
+      : `${formatMinorRupees(shift.hourlyRateMinor)} / hr`;
+
   if (section === 'shifts') {
     return shifts.map((shift, index) => ({
       id: shift.id,
@@ -571,7 +576,7 @@ function getRows(
       subtitle: `${titleCase(shift.kind)} · ${shift.area}`,
       avatar: initialsOf(shift.businessName),
       avatarTone: index % 5,
-      cells: [shift.businessName, `${dateLabel(shift.startsAt, locale)} · ${timeOnly(shift.startsAt)}`, `${shift.assignedCount} / ${shift.workersNeeded}`, `${formatMinorRupees(shift.hourlyRateMinor)} / hr`],
+      cells: [shift.businessName, `${dateLabel(shift.startsAt, locale)} · ${timeOnly(shift.startsAt)}`, `${shift.assignedCount} / ${shift.workersNeeded}`, shiftPay(shift)],
       status: titleCase(shift.status),
       statusTone: statusTone(titleCase(shift.status)),
       detailType: 'record',
@@ -582,7 +587,8 @@ function getRows(
         { label: 'Starts', value: dateTime(shift.startsAt) },
         { label: 'Ends', value: dateTime(shift.endsAt) },
         { label: 'Workers', value: `${shift.assignedCount} assigned of ${shift.workersNeeded}` },
-        { label: 'Hourly rate', value: `${formatMinorRupees(shift.hourlyRateMinor)} / hr` },
+        { label: 'Pricing', value: shift.pricingMode === 'task' ? 'Task (fixed price, completion code)' : 'Hourly' },
+        { label: shift.pricingMode === 'task' ? 'Task price per worker' : 'Hourly rate', value: shiftPay(shift) },
         ...(shift.searchRadiusKm === null ? [] : [{ label: 'Search radius', value: `${shift.searchRadiusKm} km` }]),
         { label: 'Requirements', value: shift.requirement || 'None' },
         { label: 'Responsibilities', value: shift.responsibilities || 'None' },

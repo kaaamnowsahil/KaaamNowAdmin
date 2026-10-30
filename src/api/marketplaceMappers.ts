@@ -24,6 +24,9 @@ export type ShiftRecord = {
   requirements: string;
   workers_required: number;
   hourly_rate_minor: number;
+  /** Older rows predate task pricing; missing means hourly. */
+  pricing_mode?: 'hourly' | 'task' | null;
+  task_price_minor?: number | null;
   starts_at: string;
   ends_at: string;
   workplace_name: string;
@@ -129,6 +132,8 @@ export function mapShifts(
       startsAt: shift.starts_at,
       endsAt: shift.ends_at,
       hourlyRateMinor: shift.hourly_rate_minor,
+      pricingMode: shift.pricing_mode === 'task' ? 'task' : 'hourly',
+      taskPriceMinor: shift.task_price_minor ?? null,
       workersNeeded: shift.workers_required,
       assignedCount: seats.get(shift.id) ?? 0,
       requirement: shift.requirements,
