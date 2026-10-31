@@ -20,10 +20,10 @@ type FormErrors = Partial<Record<keyof Form, string>>;
 const EXAMPLE_RATE_MINOR = 50_000;
 const EXAMPLE_MINUTES = 120;
 const FIELD_LABELS: Record<string, string> = {
-  commission_pct: 'Commission %',
-  tax_pct: 'Tax %',
-  tax_label: 'Tax label',
-  tax_base: 'Tax applied to',
+  commission_pct: 'Platform charge %',
+  tax_pct: 'Payment gateway charge %',
+  tax_label: 'Invoice label',
+  tax_base: 'Payment gateway charge applied to',
   extension_surcharge_pct: 'Extension surcharge %',
   notes: 'Notes',
 };
@@ -58,7 +58,8 @@ function changedFields(form: Form, current: LivePricingSettings) {
   );
 }
 
-/** Live Work Pricing & Charges: commission, tax and extension surcharge, with an audit trail. */
+/** Live Work Pricing & Charges: platform charge, payment gateway charge and extension surcharge,
+ * with an audit trail. */
 export function LivePricingTab({ token, onSessionExpired }: TabProps) {
   const [settings, setSettings] = useState<LivePricingSettings | null>(null);
   const [audit, setAudit] = useState<LivePricingAuditItem[]>([]);
@@ -176,7 +177,7 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
         minutes: EXAMPLE_MINUTES,
       })
     : null;
-  const label = form.tax_label.trim() || 'Tax';
+  const label = 'payment gateway charge';
   const changes = changedFields(form, settings);
 
   const field = (key: keyof Form, text: string, input: ReactNode) => (
@@ -205,22 +206,22 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
         <form className="hold-form" noValidate onSubmit={review}>
           {field(
             'commission_pct',
-            'Commission %',
+            'Platform charge %',
             <input aria-invalid={Boolean(errors.commission_pct)} inputMode="decimal" onChange={(e) => set('commission_pct', e.target.value)} value={form.commission_pct} />,
           )}
           {field(
             'tax_pct',
-            'Tax %',
+            'Payment gateway charge %',
             <input aria-invalid={Boolean(errors.tax_pct)} inputMode="decimal" onChange={(e) => set('tax_pct', e.target.value)} value={form.tax_pct} />,
           )}
           {field(
             'tax_label',
-            'Tax label (shown to Businesses)',
+            'Label stored on invoices',
             <input aria-invalid={Boolean(errors.tax_label)} maxLength={40} onChange={(e) => set('tax_label', e.target.value)} value={form.tax_label} />,
           )}
           {field(
             'tax_base',
-            'Tax applied to',
+            'Payment gateway charge applied to',
             <select onChange={(e) => set('tax_base', e.target.value as TaxBase)} value={form.tax_base}>
               {(Object.keys(TAX_BASE_LABEL) as TaxBase[]).map((base) => (
                 <option key={base} value={base}>{TAX_BASE_LABEL[base]}</option>
@@ -258,8 +259,8 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
           <div>
             <h2>Example: ₹500/h × 2 h</h2>
             <p>
-              Formula: base = rate × hours; commission = base × commission %; {label} = ({TAX_BASE_LABEL[form.tax_base].toLowerCase()})
-              × {label} %; total = base + commission + {label}. Worker receives base − commission. All amounts are rounded
+              Formula: base = rate × hours; platform charge = base × platform charge %; {label} = ({TAX_BASE_LABEL[form.tax_base].toLowerCase()})
+              × {label} %; total = base + platform charge + {label}. Worker receives base − platform charge (Workers only see this amount). All amounts are rounded
               half-up to the paisa.
             </p>
           </div>
@@ -268,8 +269,8 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
           <table className="admin-table">
             <tbody>
               <tr><td>Base amount</td><td>{rupees(preview.base)}</td></tr>
-              <tr><td>Commission ({form.commission_pct}%)</td><td>{rupees(preview.commission)}</td></tr>
-              <tr><td>{label} ({form.tax_pct}% of {rupees(preview.taxable)})</td><td>{rupees(preview.tax)}</td></tr>
+              <tr><td>Platform charge ({form.commission_pct}%)</td><td>{rupees(preview.commission)}</td></tr>
+              <tr><td>Payment gateway charge ({form.tax_pct}% of {rupees(preview.taxable)})</td><td>{rupees(preview.tax)}</td></tr>
               <tr><td className="table-primary-cell">Business pays</td><td className="table-primary-cell">{rupees(preview.total)}</td></tr>
               <tr><td>Worker receives</td><td>{rupees(preview.workerNet)}</td></tr>
               <tr><td>Extension rate (+{form.extension_surcharge_pct}%)</td><td>{rupees(preview.extensionRate)}/h</td></tr>

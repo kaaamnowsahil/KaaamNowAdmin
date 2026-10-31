@@ -44,7 +44,7 @@ export function previewPrice(input: PreviewInput) {
 }
 
 export const TAX_BASE_LABEL: Record<TaxBase, string> = {
-  subtotal: 'Base amount + commission (subtotal)',
+  subtotal: 'Base amount + platform charge (subtotal)',
   base_amount: 'Base amount only',
-  commission: 'Commission only',
+  commission: 'Platform charge only',
 };
