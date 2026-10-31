@@ -17,6 +17,11 @@ const STATUSES = ['', 'awaiting_payment', 'searching', 'filled', 'in_progress', 
 const REFUND_STATUSES = ['', 'pending', 'failed', 'processed'];
 const hours = (minutes: number) => `${Number((minutes / 60).toFixed(2))} h`;
 const label = (status: string) => status.replace(/_/g, ' ');
+/** "2/3 Workers": Workers who took a seat / Workers booked. */
+const workerCount = (booking: AdminLiveBooking) => {
+  const required = booking.workers_required ?? 1;
+  return `${booking.workers_filled ?? 0}/${required} Worker${required === 1 ? '' : 's'}`;
+};
 
 function BookingDetail({
   detail,
@@ -36,7 +41,7 @@ function BookingDetail({
         <div>
           <h2>{booking.job_title}</h2>
           <p>
-            {booking.business_name} · {booking.category_name ?? '—'} · {label(booking.shift_status)}
+            {booking.business_name} · {booking.category_name ?? '—'} · {label(booking.shift_status)} · {workerCount(booking)}
             {booking.worker_name ? ` · Worker: ${booking.worker_name} (${label(detail.assignment_status ?? '')})` : ''}
           </p>
           <p className="muted-copy">{detail.work_address}</p>
@@ -54,9 +59,15 @@ function BookingDetail({
             </td>
             <td>{rupees(pricing.base_amount_minor)}</td>
           </tr>
-          <tr><td>Commission ({pricing.commission_pct}%)</td><td>{rupees(pricing.commission_minor)}</td></tr>
-          <tr><td>{pricing.tax_label} ({pricing.tax_pct}% of {TAX_BASE_LABEL[pricing.tax_base].toLowerCase()}: {rupees(pricing.taxable_minor)})</td><td>{rupees(pricing.tax_minor)}</td></tr>
-          <tr><td className="table-primary-cell">Total</td><td className="table-primary-cell">{rupees(pricing.total_minor)}</td></tr>
+          <tr><td>Platform charge ({pricing.commission_pct}%)</td><td>{rupees(pricing.commission_minor)}</td></tr>
+          <tr><td>Payment gateway charge ({pricing.tax_pct}% of {TAX_BASE_LABEL[pricing.tax_base].toLowerCase()}: {rupees(pricing.taxable_minor)})</td><td>{rupees(pricing.tax_minor)}</td></tr>
+          <tr><td className="table-primary-cell">Total per Worker</td><td className="table-primary-cell">{rupees(pricing.total_minor)}</td></tr>
+          {(pricing.workers_required ?? 1) > 1 && (
+            <tr>
+              <td className="table-primary-cell">Booking total ({workerCount(booking)})</td>
+              <td className="table-primary-cell">{rupees(pricing.booking_total_minor ?? pricing.total_minor)}</td>
+            </tr>
+          )}
           <tr><td>Worker net (base − {rupees(pricing.worker_commission_minor)})</td><td>{rupees(pricing.worker_net_minor)}</td></tr>
           {pricing.pricing_mode === 'task' ? (
             <tr><td>Extensions</td><td>Not available for task pricing</td></tr>
@@ -69,7 +80,7 @@ function BookingDetail({
       <h3>Extensions</h3>
       <div className="table-scroll">
         <table className="admin-table">
-          <thead><tr><th>REQUESTED</th><th>MINUTES</th><th>STATUS</th><th>RATE</th><th>BASE</th><th>COMMISSION</th><th>TAX</th><th>TOTAL</th></tr></thead>
+          <thead><tr><th>REQUESTED</th><th>MINUTES</th><th>STATUS</th><th>RATE</th><th>BASE</th><th>PLATFORM CHARGE</th><th>GATEWAY CHARGE</th><th>TOTAL</th></tr></thead>
           <tbody>
             {detail.extensions.map((ext) => (
               <tr key={ext.id}>
@@ -240,7 +251,7 @@ export function LiveBookingsTab({ token, onSessionExpired }: TabProps) {
         <div className="table-scroll">
           <table className="admin-table">
             <thead>
-              <tr><th>CREATED</th><th>WORK</th><th>BUSINESS</th><th>WORKER</th><th>STATUS</th><th>PRICING</th><th>TOTAL</th><th>COMMISSION</th><th>TAX</th><th>REFUNDED</th></tr>
+              <tr><th>CREATED</th><th>WORK</th><th>BUSINESS</th><th>WORKER</th><th>WORKERS</th><th>STATUS</th><th>PRICING</th><th>TOTAL</th><th>PLATFORM CHARGE</th><th>GATEWAY CHARGE</th><th>REFUNDED</th></tr>
             </thead>
             <tbody>
               {bookings.map((booking) => (
@@ -251,9 +262,13 @@ export function LiveBookingsTab({ token, onSessionExpired }: TabProps) {
                   </td>
                   <td>{booking.business_name}</td>
                   <td>{booking.worker_name ?? '—'}</td>
+                  <td>{workerCount(booking)}</td>
                   <td>{label(booking.shift_status)}{booking.assignment_status ? ` / ${label(booking.assignment_status)}` : ''}</td>
                   <td>{booking.pricing_mode === 'task' ? `Task · ${rupees(booking.task_price_minor ?? 0)}` : hours(booking.reserved_minutes)}</td>
-                  <td>{rupees(booking.total_minor)}</td>
+                  <td>
+                    {rupees(booking.total_minor * (booking.workers_required ?? 1))}
+                    {(booking.workers_required ?? 1) > 1 ? <span className="muted-copy"> · {rupees(booking.total_minor)} each</span> : null}
+                  </td>
                   <td>{rupees(booking.commission_minor)}</td>
                   <td>{rupees(booking.tax_minor)}</td>
                   <td>
@@ -262,7 +277,7 @@ export function LiveBookingsTab({ token, onSessionExpired }: TabProps) {
                   </td>
                 </tr>
               ))}
-              {!bookings.length && !busy && <tr><td colSpan={10}>No Live Work bookings.</td></tr>}
+              {!bookings.length && !busy && <tr><td colSpan={11}>No Live Work bookings.</td></tr>}
             </tbody>
           </table>
         </div>

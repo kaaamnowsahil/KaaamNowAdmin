@@ -34,9 +34,9 @@ const EMPTY: PromoForm = {
 const SHIFT_EMPTY: PromoForm = { ...EMPTY, booking_types: 'shift' };
 
 const APPLIES_TO_LABEL: Record<PromoCode['applies_to'], string> = {
-  all_fees: 'commission + transaction charge',
-  commission: 'commission',
-  gateway: 'transaction charge',
+  all_fees: 'platform charge + payment gateway charge',
+  commission: 'platform charge',
+  gateway: 'payment gateway charge',
 };
 
 const BOOKING_LABEL: Record<PromoCode['booking_types'], string> = {
@@ -114,7 +114,7 @@ export function PromoCodesTab({ token, onSessionExpired, scope = 'all' }: PromoC
             <h2>{isShift ? 'New Shift coupon' : 'New promo code'}</h2>
             <p>
               {isShift
-                ? 'Businesses apply these at Shift checkout. Coupons only reduce platform fees (commission and transaction charge), never worker pay or tax.'
+                ? 'Businesses apply these at Shift checkout. Coupons only reduce the platform charge and payment gateway charge, never worker pay.'
                 : 'Business codes discount fees on a booking; worker codes apply to the next payout.'}
             </p>
           </div>
@@ -184,9 +184,9 @@ export function PromoCodesTab({ token, onSessionExpired, scope = 'all' }: PromoC
               onChange={(event) => set('applies_to', event.target.value as PromoCode['applies_to'])}
               value={form.applies_to}
             >
-              <option value="all_fees">Commission + transaction charge</option>
-              <option value="commission">Commission only</option>
-              <option value="gateway">Transaction charge only</option>
+              <option value="all_fees">Platform charge + payment gateway charge</option>
+              <option value="commission">Platform charge only</option>
+              <option value="gateway">Payment gateway charge only</option>
             </select>
           </label>
           <label>

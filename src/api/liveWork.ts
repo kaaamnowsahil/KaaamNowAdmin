@@ -28,6 +28,9 @@ export type LivePriceBreakdown = {
   worker_net_minor: number;
   extension_surcharge_pct: number;
   extension_rate_minor: number;
+  /** Prices above are per Worker. */
+  workers_required?: number;
+  booking_total_minor?: number;
 };
 
 export type LivePricingSettings = {
@@ -73,6 +76,8 @@ export type AdminLiveBooking = {
   business_name: string;
   worker_name: string | null;
   assignment_status: string | null;
+  workers_required?: number;
+  workers_filled?: number;
   pricing_mode: PricingMode;
   task_price_minor: number | null;
   reserved_minutes: number;
