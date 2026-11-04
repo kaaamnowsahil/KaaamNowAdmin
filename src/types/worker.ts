@@ -20,4 +20,6 @@ export type Worker = {
   verifiedAt: string | null;
   isAvailable: boolean;
   availabilityChangedAt: string | null;
+  bannedAt?: string | null;
+  feedLimitedUntil?: string | null;
 };

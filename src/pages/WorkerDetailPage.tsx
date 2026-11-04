@@ -1,3 +1,5 @@
+import { WorkerHoldPanel } from '@/features/marketplace/WorkerHoldPanel';
+
 import type { SelectedRecord } from './ManagementPage';
 import { RecordDetailPage } from './RecordDetailPage';
 
@@ -6,6 +8,8 @@ type WorkerDetailPageProps = {
   onBack: () => void;
   onToggleAccountStatus: (userId: string, suspended: boolean) => void;
   accountStatusBusy: boolean;
+  token: string;
+  onSessionExpired: () => void;
 };
 
 export function WorkerDetailPage({
@@ -13,8 +17,11 @@ export function WorkerDetailPage({
   onBack,
   onToggleAccountStatus,
   accountStatusBusy,
+  token,
+  onSessionExpired,
 }: WorkerDetailPageProps) {
   return (
+    <div className="page-stack">
     <RecordDetailPage
       record={record}
       eyebrow="WORKER"
@@ -23,5 +30,9 @@ export function WorkerDetailPage({
       onToggleAccountStatus={onToggleAccountStatus}
       accountStatusBusy={accountStatusBusy}
     />
+    {record.userId ? (
+      <WorkerHoldPanel token={token} onSessionExpired={onSessionExpired} userId={record.userId} />
+    ) : null}
+    </div>
   );
 }

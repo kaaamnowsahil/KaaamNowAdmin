@@ -4,6 +4,7 @@ import {
   listRecords,
   type Numeric,
 } from './adminResources';
+import { apiRequest } from './client';
 
 export type WorkerRestrictions = {
   id: string;
@@ -39,6 +40,21 @@ export type EarningLedgerEntry = {
 };
 
 type AssignmentSummary = { id: string };
+
+export type RestrictedWorker = {
+  worker_profile_id: string;
+  user_id: string;
+  full_name: string;
+  phone: string;
+  banned_at: string | null;
+  feed_limited_until: string | null;
+  active_strikes: number;
+};
+
+/** Workers on hold (banned) first, then those with a limited feed. */
+export function getRestrictedWorkers(token: string): Promise<RestrictedWorker[]> {
+  return apiRequest<RestrictedWorker[]>('/api/v1/admin/workers/restricted', token);
+}
 
 export function getWorkerRestrictions(
   token: string,

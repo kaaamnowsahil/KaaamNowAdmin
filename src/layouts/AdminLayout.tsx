@@ -128,6 +128,8 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
                 onBack={() => dashboard.setSelectedRecord(null)}
                 onToggleAccountStatus={dashboard.setUserSuspended}
                 accountStatusBusy={dashboard.busyDirectoryId === dashboard.selectedRecord.userId}
+                token={accessToken}
+                onSessionExpired={onSignOut}
               />
             ) : dashboard.selectedRecord.type === 'business' ? (
               <BusinessDetailPage

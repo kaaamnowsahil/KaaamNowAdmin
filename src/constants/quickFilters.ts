@@ -10,6 +10,7 @@ const QUICK_FILTERS: Partial<Record<AdminSection, QuickFilter[]>> = {
     { label: 'Verification pending', status: 'Pending' },
     { label: 'Rejected', status: 'Rejected' },
     { label: 'Verified', status: 'Verified' },
+    { label: 'On hold', status: 'On hold' },
   ],
   businesses: [
     { label: 'Verification pending', status: 'Pending' },

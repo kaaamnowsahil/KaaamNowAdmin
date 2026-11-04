@@ -11,11 +11,21 @@ import {
   type TaxBase,
 } from '@/api/liveWork';
 
-import { percentError, previewPrice, TAX_BASE_LABEL } from './livePricingMath';
+import {
+  parseBoostRupees,
+  percentError,
+  previewPrice,
+  SEARCH_RULE_LIMITS,
+  TAX_BASE_LABEL,
+  wholeNumberError,
+} from './livePricingMath';
 import { errorText, formatDate, rupees, type TabProps } from './shared';
 
-type Form = LivePricingSettingsInput;
+type SearchRuleKey = keyof typeof SEARCH_RULE_LIMITS;
+type Form = Omit<LivePricingSettingsInput, SearchRuleKey | 'boost_options_minor'> &
+  Record<SearchRuleKey, string> & { boost_rupees: string };
 type FormErrors = Partial<Record<keyof Form, string>>;
+const SEARCH_RULE_KEYS = Object.keys(SEARCH_RULE_LIMITS) as SearchRuleKey[];
 
 const EXAMPLE_RATE_MINOR = 50_000;
 const EXAMPLE_MINUTES = 120;
@@ -25,8 +35,17 @@ const FIELD_LABELS: Record<string, string> = {
   tax_label: 'Invoice label',
   tax_base: 'Payment gateway charge applied to',
   extension_surcharge_pct: 'Extension surcharge %',
+  search_timeout_minutes: 'Search time (minutes)',
+  max_search_rounds: 'Searches per booking',
+  retry_choice_minutes: 'Time to choose (minutes)',
+  boost_options_minor: 'Add-on amounts (₹)',
+  boost_rupees: 'Add-on amounts (₹)',
   notes: 'Notes',
 };
+
+const toRupeeList = (minor: number[]) => minor.map((m) => m / 100).join(', ');
+const auditValue = (field: string, value: string) =>
+  field === 'boost_options_minor' ? toRupeeList(value.split(',').map(Number)) : value;
 
 const toForm = (settings: LivePricingSettings): Form => ({
   commission_pct: String(settings.commission_pct),
@@ -34,7 +53,24 @@ const toForm = (settings: LivePricingSettings): Form => ({
   tax_label: settings.tax_label,
   tax_base: settings.tax_base,
   extension_surcharge_pct: String(settings.extension_surcharge_pct),
+  search_timeout_minutes: String(settings.search_timeout_minutes),
+  max_search_rounds: String(settings.max_search_rounds),
+  retry_choice_minutes: String(settings.retry_choice_minutes),
+  boost_rupees: toRupeeList(settings.boost_options_minor),
   notes: '',
+});
+
+const toBody = (form: Form): LivePricingSettingsInput => ({
+  commission_pct: form.commission_pct,
+  tax_pct: form.tax_pct,
+  tax_label: form.tax_label.trim(),
+  tax_base: form.tax_base,
+  extension_surcharge_pct: form.extension_surcharge_pct,
+  search_timeout_minutes: Number(form.search_timeout_minutes),
+  max_search_rounds: Number(form.max_search_rounds),
+  retry_choice_minutes: Number(form.retry_choice_minutes),
+  boost_options_minor: parseBoostRupees(form.boost_rupees).minor,
+  notes: form.notes.trim(),
 });
 
 function validate(form: Form): FormErrors {
@@ -45,15 +81,32 @@ function validate(form: Form): FormErrors {
   }
   if (!form.tax_label.trim()) errors.tax_label = 'Required.';
   else if (form.tax_label.trim().length > 40) errors.tax_label = 'At most 40 characters.';
+  for (const key of SEARCH_RULE_KEYS) {
+    const [min, max] = SEARCH_RULE_LIMITS[key];
+    const message = wholeNumberError(form[key], min, max);
+    if (message) errors[key] = message;
+  }
+  const boost = parseBoostRupees(form.boost_rupees).error;
+  if (boost) errors.boost_rupees = boost;
   return errors;
 }
 
 function changedFields(form: Form, current: LivePricingSettings) {
   const before = toForm(current);
-  return (['commission_pct', 'tax_pct', 'tax_label', 'tax_base', 'extension_surcharge_pct'] as const).filter(
-    (key) =>
-      key === 'tax_label' || key === 'tax_base'
-        ? form[key].trim() !== before[key]
+  const keys = [
+    'commission_pct',
+    'tax_pct',
+    'tax_label',
+    'tax_base',
+    'extension_surcharge_pct',
+    ...SEARCH_RULE_KEYS,
+    'boost_rupees',
+  ] as const;
+  return keys.filter((key) =>
+    key === 'tax_label' || key === 'tax_base'
+      ? form[key].trim() !== before[key]
+      : key === 'boost_rupees'
+        ? parseBoostRupees(form[key]).minor.join() !== current.boost_options_minor.join()
         : Number(form[key]) !== Number(before[key]),
   );
 }
@@ -75,7 +128,8 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
     (cause: unknown) => {
       if (cause instanceof ApiError && cause.status === 401) onSessionExpired();
       else if (cause instanceof ApiError && Object.keys(cause.fieldErrors).length) {
-        setErrors(cause.fieldErrors as FormErrors);
+        const { boost_options_minor: boost, ...rest } = cause.fieldErrors as Record<string, string>;
+        setErrors({ ...(rest as FormErrors), ...(boost ? { boost_rupees: boost } : {}) });
         setError(cause.message);
       } else setError(errorText(cause));
     },
@@ -128,15 +182,11 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
     setBusy(true);
     setError('');
     try {
-      const next = await updateLivePricing(token, {
-        ...form,
-        tax_label: form.tax_label.trim(),
-        notes: form.notes.trim(),
-      });
+      const next = await updateLivePricing(token, toBody(form));
       setSettings(next);
       setForm(toForm(next));
       setConfirming(false);
-      setNotice(`Saved as version ${next.version}. New Live Work bookings use it; existing bookings keep their price.`);
+      setNotice(`Saved as version ${next.version}. New Live Work bookings use it; existing bookings keep their price and search rules.`);
       const history = await getLivePricingAudit(token);
       setAudit(history.items);
       setAuditTotal(history.total);
@@ -233,6 +283,32 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
             'Extension surcharge %',
             <input aria-invalid={Boolean(errors.extension_surcharge_pct)} inputMode="decimal" onChange={(e) => set('extension_surcharge_pct', e.target.value)} value={form.extension_surcharge_pct} />,
           )}
+          <p className="muted-copy">
+            Live search &amp; retry: if no Worker accepts during a search, the Business can add one of the amounts below
+            to the pay (per hour for hourly work, on the task price for task work) and search again, up to the number
+            of searches set here. The add-on is billed on the final bill. With no choice in time, or after the last
+            search, the Business is refunded in full. The Terms describe the current values, so update them too.
+          </p>
+          {field(
+            'search_timeout_minutes',
+            'Search time (minutes, 5–120)',
+            <input aria-invalid={Boolean(errors.search_timeout_minutes)} inputMode="numeric" onChange={(e) => set('search_timeout_minutes', e.target.value)} value={form.search_timeout_minutes} />,
+          )}
+          {field(
+            'max_search_rounds',
+            'Searches per booking (1–5; 1 = no retry)',
+            <input aria-invalid={Boolean(errors.max_search_rounds)} inputMode="numeric" onChange={(e) => set('max_search_rounds', e.target.value)} value={form.max_search_rounds} />,
+          )}
+          {field(
+            'retry_choice_minutes',
+            'Time to choose refund or search again (minutes, 2–60)',
+            <input aria-invalid={Boolean(errors.retry_choice_minutes)} inputMode="numeric" onChange={(e) => set('retry_choice_minutes', e.target.value)} value={form.retry_choice_minutes} />,
+          )}
+          {field(
+            'boost_rupees',
+            'Add-on amounts in ₹ (comma separated, up to 5)',
+            <input aria-invalid={Boolean(errors.boost_rupees)} onChange={(e) => set('boost_rupees', e.target.value)} placeholder="10, 20, 30" value={form.boost_rupees} />,
+          )}
           {field(
             'notes',
             'Reason for change',
@@ -302,8 +378,8 @@ export function LivePricingTab({ token, onSessionExpired }: TabProps) {
                   <td>{formatDate(item.changed_at)}</td>
                   <td>v{item.settings_version}</td>
                   <td>{FIELD_LABELS[item.field] ?? item.field}</td>
-                  <td>{item.old_value ?? '—'}</td>
-                  <td>{item.new_value}</td>
+                  <td>{item.old_value == null ? '—' : auditValue(item.field, item.old_value)}</td>
+                  <td>{auditValue(item.field, item.new_value)}</td>
                   <td>{item.changed_by_label}</td>
                 </tr>
               ))}
