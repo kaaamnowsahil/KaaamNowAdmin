@@ -20,6 +20,8 @@ type WorkerProfileResponse = {
   rating_avg: number;
   rating_count: number;
   completed_shift_count: number;
+  banned_at?: string | null;
+  feed_limited_until?: string | null;
 };
 
 type VerificationQueue = {
@@ -55,6 +57,8 @@ function mapWorker(profile: WorkerProfileResponse): Worker {
     verifiedAt: profile.verified_at,
     isAvailable: profile.is_available,
     availabilityChangedAt: profile.availability_changed_at,
+    bannedAt: profile.banned_at ?? null,
+    feedLimitedUntil: profile.feed_limited_until ?? null,
   };
 }
 

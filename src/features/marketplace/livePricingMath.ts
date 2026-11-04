@@ -48,3 +48,37 @@ export const TAX_BASE_LABEL: Record<TaxBase, string> = {
   base_amount: 'Base amount only',
   commission: 'Platform charge only',
 };
+
+/** Search + retry limits, same as the server. */
+export const SEARCH_RULE_LIMITS = {
+  search_timeout_minutes: [5, 120],
+  max_search_rounds: [1, 5],
+  retry_choice_minutes: [2, 60],
+} as const;
+export const MAX_BOOST_OPTIONS = 5;
+export const BOOST_RUPEES_RANGE = [1, 1000] as const;
+
+/** Returns an error message, or '' when the value is a whole number from min to max. */
+export function wholeNumberError(value: string, min: number, max: number): string {
+  const text = value.trim();
+  if (!text) return 'Required.';
+  if (!/^\d+$/.test(text)) return 'Enter a whole number.';
+  const n = Number(text);
+  if (n < min || n > max) return `Must be between ${min} and ${max}.`;
+  return '';
+}
+
+/** "10, 20, 30" (rupees) → [1000, 2000, 3000] (paise, sorted), or an error message. */
+export function parseBoostRupees(value: string): { minor: number[]; error: string } {
+  const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
+  const [low, high] = BOOST_RUPEES_RANGE;
+  if (!parts.length || parts.length > MAX_BOOST_OPTIONS) {
+    return { minor: [], error: `Give 1 to ${MAX_BOOST_OPTIONS} amounts, separated by commas.` };
+  }
+  if (parts.some((part) => !/^\d+$/.test(part) || Number(part) < low || Number(part) > high)) {
+    return { minor: [], error: `Each amount must be whole rupees from ₹${low} to ₹${high.toLocaleString('en-IN')}.` };
+  }
+  const rupees = parts.map(Number);
+  if (new Set(rupees).size !== rupees.length) return { minor: [], error: 'Each amount can appear only once.' };
+  return { minor: rupees.map((r) => r * 100).sort((a, b) => a - b), error: '' };
+}

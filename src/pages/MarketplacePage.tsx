@@ -27,7 +27,7 @@ type Tab =
 const TABS: { id: Tab; label: string }[] = [
   { id: 'urgent', label: 'Urgent support' },
   { id: 'booking', label: 'Booking ledger' },
-  { id: 'workers', label: 'Worker dues & strikes' },
+  { id: 'workers', label: 'Worker bans, dues & strikes' },
   { id: 'shift-pricing', label: 'Shift pricing & charges' },
   { id: 'shift-coupons', label: 'Shift coupons' },
   { id: 'promos', label: 'All promo codes' },

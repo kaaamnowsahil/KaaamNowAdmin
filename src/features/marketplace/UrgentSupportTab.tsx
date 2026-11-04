@@ -13,6 +13,12 @@ import { formatDate, useAdminCall, type TabProps } from './shared';
 
 const OPEN_STATUSES: TicketStatus[] = ['open', 'in_progress'];
 
+/** Digits for wa.me; bare 10-digit numbers are treated as Indian (+91). */
+const whatsappNumber = (phone: string) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10 ? `91${digits}` : digits;
+};
+
 /** Emergency / urgent tickets first; resolve with a note or jump to the booking ledger. */
 export function UrgentSupportTab({
   token,
@@ -69,7 +75,12 @@ export function UrgentSupportTab({
                 <h2>{`${ticket.topic === 'emergency' ? 'EMERGENCY · ' : ''}${ticket.subject}`}</h2>
                 <p>{`${user?.full_name || 'User'} · ${user?.phone ?? ticket.user_id} · ${formatDate(ticket.created_at)} · ${ticket.status}`}</p>
               </div>
-              {user?.phone ? <a className="secondary-button" href={`tel:${user.phone}`}>Call</a> : null}
+              {user?.phone ? (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <a className="secondary-button" href={`https://wa.me/${whatsappNumber(user.phone)}`} rel="noopener noreferrer" target="_blank">WhatsApp</a>
+                  <a className="secondary-button" href={`tel:${user.phone}`}>Call</a>
+                </div>
+              ) : null}
             </div>
             <p>{ticket.message || '—'}</p>
             <div className="hold-form">

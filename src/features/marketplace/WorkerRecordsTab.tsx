@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { applyBookingOverride } from '@/api/bookings';
 import {
   getLatestAssignmentId,
+  getRestrictedWorkers,
   getWorkerLedger,
   getWorkerRestrictions,
   getWorkerStrikes,
   type EarningLedgerEntry,
+  type RestrictedWorker,
   type WorkerRestrictions,
   type WorkerStrike,
 } from '@/api/workerRecords';
@@ -29,10 +31,19 @@ export function WorkerRecordsTab({ token, onSessionExpired }: TabProps) {
   const [records, setRecords] = useState<Records | null>(null);
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState('');
+  const [restricted, setRestricted] = useState<RestrictedWorker[]>([]);
 
-  const load = async () => {
+  const loadRestricted = useCallback(async () => {
+    const next = await run(() => getRestrictedWorkers(token));
+    if (next) setRestricted(next);
+  }, [run, token]);
+
+  useEffect(() => {
+    void loadRestricted();
+  }, [loadRestricted]);
+
+  const load = async (id = workerId.trim()) => {
     setNotice('');
-    const id = workerId.trim();
     const next = await run(async () => {
       const [restrictions, strikes, ledger] = await Promise.all([
         getWorkerRestrictions(token, id),
@@ -51,19 +62,66 @@ export function WorkerRecordsTab({ token, onSessionExpired }: TabProps) {
       return applyBookingOverride(token, target, { action, reason: reason.trim() });
     });
     if (done) {
-      setNotice(action === 'void_strike' ? 'Strike voided.' : 'Worker unbanned.');
+      setNotice(
+        action === 'void_strike'
+          ? 'Strike voided.'
+          : 'Worker unbanned, active strikes cleared and the worker notified.',
+      );
       void load();
+      void loadRestricted();
     }
   };
 
   const balance = records?.ledger.reduce((sum, entry) => sum + entry.amount_minor, 0) ?? 0;
   const liveStrikes = records?.strikes.filter(isLive) ?? [];
   const strikeTotal = liveStrikes.reduce((sum, strike) => sum + Number(strike.weight), 0);
-  const restricted = Boolean(records?.restrictions.banned_at || records?.restrictions.feed_limited_until);
+  const isRestricted = Boolean(records?.restrictions.banned_at || records?.restrictions.feed_limited_until);
   const reasonOk = reason.trim().length >= 5;
 
   return (
     <div className="page-stack">
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Banned &amp; limited workers</h2>
+            <p>On hold workers can&apos;t see or accept shifts. Open one to review strikes and unban.</p>
+          </div>
+          <button className="secondary-button" disabled={busy} onClick={() => void loadRestricted()} type="button">Refresh</button>
+        </div>
+        <div className="table-scroll">
+          <table className="admin-table">
+            <thead><tr><th>WORKER</th><th>PHONE</th><th>STATUS</th><th>ACTIVE STRIKES</th><th /></tr></thead>
+            <tbody>
+              {restricted.map((worker) => (
+                <tr key={worker.worker_profile_id}>
+                  <td>{worker.full_name || '—'}</td>
+                  <td>{worker.phone}</td>
+                  <td>
+                    {worker.banned_at
+                      ? `On hold since ${formatDate(worker.banned_at)}`
+                      : `Fewer shifts until ${formatDate(worker.feed_limited_until)}`}
+                  </td>
+                  <td>{worker.active_strikes}</td>
+                  <td>
+                    <button
+                      className="text-button"
+                      disabled={busy}
+                      onClick={() => {
+                        setWorkerId(worker.worker_profile_id);
+                        void load(worker.worker_profile_id);
+                      }}
+                      type="button"
+                    >
+                      Open
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {restricted.length === 0 ? <p className="empty-state">No banned or limited workers.</p> : null}
+        </div>
+      </section>
       <form className="deletion-toolbar" onSubmit={(event) => { event.preventDefault(); void load(); }}>
         <label>
           Worker profile ID
@@ -88,10 +146,13 @@ export function WorkerRecordsTab({ token, onSessionExpired }: TabProps) {
               Reason for any override <span className="field-hint">(5–500 characters)</span>
               <textarea maxLength={500} onChange={(event) => setReason(event.target.value)} value={reason} />
             </label>
-            {restricted && (
-              <button className="primary-button" disabled={busy || !reasonOk} onClick={() => void override('unban_worker', null)} type="button">
-                Unban / remove limit
-              </button>
+            {isRestricted && (
+              <>
+                <button className="primary-button" disabled={busy || !reasonOk} onClick={() => void override('unban_worker', null)} type="button">
+                  Unban / remove limit
+                </button>
+                <p className="field-hint">Also clears the worker&apos;s active strikes and notifies them.</p>
+              </>
             )}
           </section>
 

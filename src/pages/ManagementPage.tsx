@@ -184,7 +184,8 @@ export function ManagementPage({
     return (
       matchesSearch &&
       (statusFilter === ALL_STATUSES ||
-        normalizeStatus(row.status) === normalizeStatus(statusFilter))
+        matchesStatus(row.status, statusFilter) ||
+        Boolean(row.secondaryStatuses?.some(item => matchesStatus(item.label, statusFilter))))
       &&
       (attributeFilter === 'All categories' ||
         row.cells.some(
@@ -420,7 +421,7 @@ function getSectionMetrics(section: AdminSection, rows: Row[]): ManagementMetric
         { label: 'Total workers', value: String(rows.length), attention: false },
         { label: 'Active accounts', value: String(countSecondary('active')), attention: false },
         { label: 'Verification pending', value: String(count('pending')), attention: true },
-        { label: 'Suspended accounts', value: String(countSecondary('suspended')), attention: false },
+        { label: 'On hold / suspended', value: String(rows.filter(row => row.secondaryStatuses?.some(item => matchesStatus(item.label, 'on hold', 'suspended'))).length), attention: true },
       ];
     case 'businesses':
       return [
@@ -462,6 +463,24 @@ function getSectionMetrics(section: AdminSection, rows: Row[]): ManagementMetric
   }
 }
 
+function isFeedLimited(worker: Worker): boolean {
+  return Boolean(worker.feedLimitedUntil && new Date(worker.feedLimitedUntil).getTime() > Date.now());
+}
+
+function workerHoldBadge(worker: Worker): { label: string; tone: Row['statusTone'] }[] {
+  if (worker.bannedAt) return [{ label: 'On hold', tone: 'danger' }];
+  if (isFeedLimited(worker)) return [{ label: 'Fewer shifts', tone: 'warning' }];
+  return [];
+}
+
+function workerHoldLabel(worker: Worker, locale: string): string {
+  if (worker.bannedAt) return `On hold since ${dateLabel(worker.bannedAt, locale)}`;
+  if (isFeedLimited(worker) && worker.feedLimitedUntil) {
+    return `Fewer shifts until ${dateLabel(worker.feedLimitedUntil, locale)}`;
+  }
+  return 'None';
+}
+
 function getRows(
   section: AdminSection,
   workers: Worker[],
@@ -492,6 +511,7 @@ function getRows(
       status: titleCase(worker.verificationStatus),
       statusTone: statusTone(worker.verificationStatus),
       secondaryStatuses: [
+        ...workerHoldBadge(worker),
         {
           label: worker.isActive ? 'Active' : 'Suspended',
           tone: worker.isActive ? 'success' : 'danger',
@@ -511,6 +531,7 @@ function getRows(
         { label: 'Verification status', value: titleCase(worker.verificationStatus) },
         { label: 'Account status', value: worker.isActive ? 'Active' : 'Suspended' },
         { label: 'Availability', value: worker.isAvailable ? 'Available' : 'Unavailable' },
+        { label: 'Account hold', value: workerHoldLabel(worker, locale) },
         { label: 'Rating count', value: String(worker.ratingCount) },
         { label: 'Completed shifts', value: String(worker.completedShifts) },
         { label: 'Verification note', value: worker.verificationNote ?? 'None' },

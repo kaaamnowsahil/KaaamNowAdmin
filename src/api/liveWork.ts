@@ -41,6 +41,11 @@ export type LivePricingSettings = {
   tax_base: TaxBase;
   tax_base_description: string;
   extension_surcharge_pct: number;
+  /** Search + retry rules (versioned with the rates; a booking keeps its version's rules). */
+  search_timeout_minutes: number;
+  max_search_rounds: number;
+  retry_choice_minutes: number;
+  boost_options_minor: number[];
   effective_from: string;
   changed_by_label: string;
   notes: string;
@@ -53,6 +58,10 @@ export type LivePricingSettingsInput = {
   tax_label: string;
   tax_base: TaxBase;
   extension_surcharge_pct: string;
+  search_timeout_minutes: number;
+  max_search_rounds: number;
+  retry_choice_minutes: number;
+  boost_options_minor: number[];
   notes: string;
 };
 
