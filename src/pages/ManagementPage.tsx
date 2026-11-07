@@ -46,6 +46,7 @@ export type SelectedRecord = {
   userId?: string;
   accountIsActive?: boolean;
   imageUrl?: string | null;
+  payout?: Payout;
 };
 
 type ManagementPageProps = {
@@ -92,6 +93,7 @@ type Row = {
   verificationType?: 'worker' | 'business';
   details: DetailItem[];
   detailType: SelectedRecord['type'];
+  payout?: Payout;
 };
 
 const sectionMeta: Record<AdminSection, { title: string; description: string; label: string; action: string; columns: string[] }> = {
@@ -99,7 +101,7 @@ const sectionMeta: Record<AdminSection, { title: string; description: string; la
   businesses: { title: 'Businesses', description: 'Manage business profiles, verification and marketplace activity.', label: 'ALL BUSINESSES', action: 'Export businesses', columns: ['Business', 'Business type', 'Location', 'Rating', 'Reviews', 'Status'] },
   shifts: { title: 'Shifts', description: 'Monitor live requests and scheduled work across the city.', label: 'ALL SHIFTS', action: 'Export shifts', columns: ['Shift', 'Business', 'Schedule', 'Workers', 'Pay rate', 'Status'] },
   payments: { title: 'Payments', description: 'Track business charges, platform fees and transaction status.', label: 'TRANSACTION LEDGER', action: 'Export ledger', columns: ['Transaction', 'Business', 'Date', 'Method', 'Amount', 'Status'] },
-  payouts: { title: 'Payouts', description: 'Worker withdrawals. Status is updated by the payout provider, not from this dashboard.', label: 'PAYOUT QUEUE', action: 'Export payouts', columns: ['Worker', 'Method', 'Requested', 'Amount', 'Status'] },
+  payouts: { title: 'Payouts', description: 'Worker withdrawals. For manual payouts, open a request, pay the worker by UPI or bank, then upload the screenshot and mark it paid.', label: 'PAYOUT QUEUE', action: 'Export payouts', columns: ['Worker', 'Method', 'Requested', 'Amount', 'Status'] },
   approvals: { title: 'Approvals', description: 'Review and verify pending worker and business profiles.', label: 'REVIEW QUEUE', action: 'Export queue', columns: ['Applicant', 'Profile type', 'Phone', 'Location', 'Status'] },
   support: { title: 'Support', description: 'Track critical issues raised by workers and businesses across the platform.', label: 'SUPPORT TICKETS', action: 'Export tickets', columns: ['Subject', 'Raised by', 'Topic', 'Priority', 'Status'] },
 };
@@ -221,6 +223,7 @@ export function ManagementPage({
       userId: row.userId,
       accountIsActive: row.accountIsActive,
       imageUrl: row.imageUrl,
+      payout: row.payout,
     });
   };
 
@@ -350,7 +353,7 @@ export function ManagementPage({
                   {!isDirectory ? <td>
                     {section === 'approvals' && matchesStatus(row.status, 'pending') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, imageUrl: row.imageUrl })}><Eye size={16} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, payout: row.payout, imageUrl: row.imageUrl })}><Eye size={16} /></button>
                         {onVerifyProfile && row.verificationType ? (
                           <>
                             <button className="approval-action approve-action" disabled={busyDirectoryId === row.id} aria-label={formatText('Verify {{name}}', { name: row.title })} onClick={() => row.verificationType && onVerifyProfile(row.verificationType, row.id, 'verified')}>
@@ -364,14 +367,14 @@ export function ManagementPage({
                       </div>
                     ) : section === 'support' && onResolveTicket && !matchesStatus(row.status, 'closed') ? (
                       <div className="approval-row-actions">
-                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, imageUrl: row.imageUrl })}><Eye size={16} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, payout: row.payout, imageUrl: row.imageUrl })}><Eye size={16} /></button>
                         <button className="approval-action approve-action" disabled={Boolean(busyTicketId)} aria-label={formatText('Close ticket {{name}}', { name: row.title })} onClick={() => onResolveTicket(row.id)}>
                           {busyTicketId === row.id ? <LoadingIndicator label="Closing…" className="loading-indicator-compact" /> : <Check size={15} />}
                         </button>
                       </div>
                     ) : (
                       <div className="last-cell-actions">
-                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType })}><MoreHorizontal size={17} /></button>
+                        <button className="icon-button row-view" aria-label={formatText('View {{name}}', { name: row.title })} onClick={() => onSelect({ title: row.title, subtitle: row.id, details: row.details, type: row.detailType, payout: row.payout })}><MoreHorizontal size={17} /></button>
                       </div>
                     )}
                   </td> : null}
@@ -657,6 +660,7 @@ function getRows(
       status: titleCase(payout.status),
       statusTone: statusTone(payout.status),
       detailType: 'record',
+      payout,
       details: [
         { label: 'Worker', value: `${payout.workerName} (${payout.workerId})` },
         { label: 'Reference', value: payout.reference },

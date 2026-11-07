@@ -5,6 +5,7 @@ import {
   UNKNOWN_BUSINESS,
   UNKNOWN_USER,
   UNKNOWN_WORKER,
+  manualPayTo,
   mapPayments,
   mapPayouts,
   mapShifts,
@@ -205,6 +206,40 @@ describe('mapPayouts', () => {
       status: 'failed',
       failureReason: 'IFSC invalid',
     });
+  });
+
+  it('shows full pay-to details only while a manual withdrawal waits to be paid', () => {
+    const bank = account({
+      account_type: 'bank',
+      account_holder_name: 'Asha K',
+      bank_account_number: '000011112222',
+      bank_ifsc: 'SBIN0001',
+    });
+    const [open] = mapPayouts([withdrawal({ provider: 'manual', status: 'initiated' })], [bank], [worker]);
+    expect(open?.destination).toBe('•••• 2222 · SBIN0001');
+    expect(open?.payTo).toEqual([
+      { label: 'Account holder', value: 'Asha K' },
+      { label: 'Account number', value: '000011112222' },
+      { label: 'IFSC', value: 'SBIN0001' },
+    ]);
+
+    const [paid] = mapPayouts(
+      [withdrawal({ provider: 'manual', status: 'paid', payout_utr: 'UTR123', proof_url: 'https://x/p.png' })],
+      [bank],
+      [worker],
+    );
+    expect(paid).toMatchObject({ payTo: [], utr: 'UTR123', proofUrl: 'https://x/p.png' });
+    expect(mapPayouts([withdrawal()], [bank], [worker])[0]?.payTo).toEqual([]);
+  });
+});
+
+describe('manualPayTo', () => {
+  it('gives the UPI id or Paytm number to pay', () => {
+    expect(manualPayTo(undefined)).toEqual([]);
+    expect(manualPayTo(account({ upi_id: 'asha@upi' }))).toEqual([{ label: 'UPI ID', value: 'asha@upi' }]);
+    expect(manualPayTo(account({ account_type: 'paytm', paytm_phone: '9876543210' }))).toEqual([
+      { label: 'Paytm number', value: '9876543210' },
+    ]);
   });
 });
 

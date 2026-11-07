@@ -40,7 +40,7 @@ export async function apiRequest<T>(
       ...init,
       headers: {
         Accept: 'application/json',
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init.headers,
       },

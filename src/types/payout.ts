@@ -1,6 +1,6 @@
 export type PayoutMethod = 'UPI' | 'Paytm' | 'Bank' | 'Unknown';
 
-/** `withdrawals.status`; moved only by the payout provider sync, never by the dashboard. */
+/** `withdrawals.status`. Provider payouts move by the payout sync; manual ones by an admin. */
 export type PayoutStatus = 'initiated' | 'processing' | 'paid' | 'failed';
 
 export type Payout = {
@@ -12,9 +12,13 @@ export type Payout = {
   method: PayoutMethod;
   /** UPI id, wallet number or masked bank account. */
   destination: string;
+  /** Full details to pay a manual withdrawal to; only filled while it is waiting. */
+  payTo: { label: string; value: string }[];
   provider: string;
   requestedAt: string;
   completedAt: string | null;
   status: PayoutStatus;
   failureReason: string | null;
+  utr: string | null;
+  proofUrl: string | null;
 };

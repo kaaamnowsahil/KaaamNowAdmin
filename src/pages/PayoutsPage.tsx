@@ -20,7 +20,7 @@ type PayoutsPageProps = {
   serverTotal?: number;
 };
 
-/** Read-only: withdrawal status is driven by the payout provider sync, not the dashboard. */
+/** Withdrawals list; a manual withdrawal is settled from its detail page. */
 export function PayoutsPage({
   businesses,
   payments,

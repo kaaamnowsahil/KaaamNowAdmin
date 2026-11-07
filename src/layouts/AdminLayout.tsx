@@ -144,6 +144,9 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
                 eyebrow={pageTitles[section].toUpperCase()}
                 description={'Review the operational details for this marketplace record.'}
                 onBack={() => dashboard.setSelectedRecord(null)}
+                token={accessToken}
+                onSessionExpired={onSignOut}
+                onRecordChanged={() => void dashboard.reloadRecords()}
               />
             )
           ) : section === 'overview' ? (

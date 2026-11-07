@@ -70,6 +70,8 @@ export type WithdrawalRecord = {
   failure_reason: string | null;
   initiated_at: string;
   completed_at: string | null;
+  payout_utr?: string | null;
+  proof_url?: string | null;
 };
 
 export type PayoutAccountRecord = {
@@ -79,6 +81,7 @@ export type PayoutAccountRecord = {
   paytm_phone: string | null;
   bank_account_number: string | null;
   bank_ifsc: string | null;
+  account_holder_name?: string | null;
 };
 
 export type MarketplaceRecords = {
@@ -180,13 +183,29 @@ const PAYOUT_METHODS: Record<PayoutAccountRecord['account_type'], PayoutMethod> 
   bank: 'Bank',
 };
 
-/** Never exposes a full bank account number in the dashboard. */
+/** Masked for lists; the full number shows only on a manual withdrawal waiting to be paid. */
 export function payoutDestination(account: PayoutAccountRecord | undefined): string {
   if (!account) return '';
   if (account.account_type === 'upi') return account.upi_id ?? '';
   if (account.account_type === 'paytm') return account.paytm_phone ?? '';
   const last4 = (account.bank_account_number ?? '').slice(-4);
   return [last4 ? `•••• ${last4}` : '', account.bank_ifsc ?? ''].filter(Boolean).join(' · ');
+}
+
+const MANUAL_PROVIDER = 'manual';
+const OPEN_PAYOUT_STATUSES = new Set<PayoutStatus>(['initiated', 'processing']);
+
+/** Full details the admin pays a manual withdrawal to. */
+export function manualPayTo(account: PayoutAccountRecord | undefined): { label: string; value: string }[] {
+  if (!account) return [];
+  const holder = account.account_holder_name ? [{ label: 'Account holder', value: account.account_holder_name }] : [];
+  if (account.account_type === 'upi') return [...holder, { label: 'UPI ID', value: account.upi_id ?? '' }];
+  if (account.account_type === 'paytm') return [...holder, { label: 'Paytm number', value: account.paytm_phone ?? '' }];
+  return [
+    ...holder,
+    { label: 'Account number', value: account.bank_account_number ?? '' },
+    { label: 'IFSC', value: account.bank_ifsc ?? '' },
+  ];
 }
 
 export function mapPayouts(
@@ -206,11 +225,17 @@ export function mapPayouts(
       amountMinor: withdrawal.amount_minor,
       method: account ? PAYOUT_METHODS[account.account_type] : 'Unknown',
       destination: payoutDestination(account),
+      payTo:
+        withdrawal.provider === MANUAL_PROVIDER && OPEN_PAYOUT_STATUSES.has(withdrawal.status)
+          ? manualPayTo(account)
+          : [],
       provider: withdrawal.provider,
       requestedAt: withdrawal.initiated_at,
       completedAt: withdrawal.completed_at,
       status: withdrawal.status,
       failureReason: withdrawal.failure_reason,
+      utr: withdrawal.payout_utr ?? null,
+      proofUrl: withdrawal.proof_url ?? null,
     };
   });
 }

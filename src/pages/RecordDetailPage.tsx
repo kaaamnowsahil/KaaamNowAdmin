@@ -2,6 +2,7 @@ import { formatText } from '@/utils/text';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 
 import { ProfileAvatar } from '@/components/ProfileAvatar';
+import { ManualPayoutPanel } from '@/features/payouts/ManualPayoutPanel';
 import type { SelectedRecord } from './ManagementPage';
 
 type RecordDetailPageProps = {
@@ -11,6 +12,9 @@ type RecordDetailPageProps = {
   onBack: () => void;
   onToggleAccountStatus?: (userId: string, suspended: boolean) => void;
   accountStatusBusy?: boolean;
+  token?: string;
+  onSessionExpired?: () => void;
+  onRecordChanged?: () => void;
 };
 
 export function RecordDetailPage({
@@ -20,6 +24,9 @@ export function RecordDetailPage({
   onBack,
   onToggleAccountStatus,
   accountStatusBusy = false,
+  token,
+  onSessionExpired,
+  onRecordChanged,
 }: RecordDetailPageProps) {
   const toggleAccountStatus = () => {
     if (record.userId === undefined || record.accountIsActive === undefined) return;
@@ -77,6 +84,15 @@ export function RecordDetailPage({
           </button>
         ) : null}
       </section>
+
+      {record.payout && token && onSessionExpired ? (
+        <ManualPayoutPanel
+          onSessionExpired={onSessionExpired}
+          onSettled={() => onRecordChanged?.()}
+          payout={record.payout}
+          token={token}
+        />
+      ) : null}
 
       <section className="detail-fields-grid" aria-label={formatText('{{type}} details', { type: eyebrow.toLowerCase() })}>
         {record.details.map((item, index) => (
