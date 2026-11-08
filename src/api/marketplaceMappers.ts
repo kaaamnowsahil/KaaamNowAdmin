@@ -82,6 +82,7 @@ export type PayoutAccountRecord = {
   bank_account_number: string | null;
   bank_ifsc: string | null;
   account_holder_name?: string | null;
+  upi_qr_url?: string | null;
 };
 
 export type MarketplaceRecords = {
@@ -229,6 +230,10 @@ export function mapPayouts(
         withdrawal.provider === MANUAL_PROVIDER && OPEN_PAYOUT_STATUSES.has(withdrawal.status)
           ? manualPayTo(account)
           : [],
+      payQrUrl:
+        withdrawal.provider === MANUAL_PROVIDER && OPEN_PAYOUT_STATUSES.has(withdrawal.status)
+          ? (account?.upi_qr_url ?? null)
+          : null,
       provider: withdrawal.provider,
       requestedAt: withdrawal.initiated_at,
       completedAt: withdrawal.completed_at,

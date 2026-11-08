@@ -231,6 +231,14 @@ describe('mapPayouts', () => {
     expect(paid).toMatchObject({ payTo: [], utr: 'UTR123', proofUrl: 'https://x/p.png' });
     expect(mapPayouts([withdrawal()], [bank], [worker])[0]?.payTo).toEqual([]);
   });
+
+  it('shows the worker UPI QR only while a manual withdrawal waits to be paid', () => {
+    const upi = account({ account_type: 'upi', upi_id: 'asha@okaxis', upi_qr_url: 'https://x/qr.png' });
+    const [open] = mapPayouts([withdrawal({ provider: 'manual', status: 'processing' })], [upi], [worker]);
+    expect(open?.payQrUrl).toBe('https://x/qr.png');
+    const [paid] = mapPayouts([withdrawal({ provider: 'manual', status: 'paid' })], [upi], [worker]);
+    expect(paid?.payQrUrl).toBeNull();
+  });
 });
 
 describe('manualPayTo', () => {

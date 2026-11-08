@@ -111,6 +111,13 @@ export function ManualPayoutPanel({ payout: initial, token, onSessionExpired, on
         </div>
       </dl>
 
+      {payout.payQrUrl ? (
+        <a className="payout-qr" href={payout.payQrUrl} rel="noreferrer" target="_blank">
+          <img alt={`UPI QR code of ${payout.workerName}`} src={payout.payQrUrl} />
+          <span>Scan to pay · open full size</span>
+        </a>
+      ) : null}
+
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
       {!rejecting ? (

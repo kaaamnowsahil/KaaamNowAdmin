@@ -14,6 +14,8 @@ export type Payout = {
   destination: string;
   /** Full details to pay a manual withdrawal to; only filled while it is waiting. */
   payTo: { label: string; value: string }[];
+  /** Worker's UPI QR screenshot to scan, while a manual withdrawal is waiting. */
+  payQrUrl: string | null;
   provider: string;
   requestedAt: string;
   completedAt: string | null;
