@@ -9,6 +9,7 @@ import { SearchRadiusTab } from '@/features/marketplace/SearchRadiusTab';
 import { ShiftPricingTab } from '@/features/marketplace/ShiftPricingTab';
 import { TermsAcceptancesTab } from '@/features/marketplace/TermsAcceptancesTab';
 import { UrgentSupportTab } from '@/features/marketplace/UrgentSupportTab';
+import { WithdrawalSettingsTab } from '@/features/marketplace/WithdrawalSettingsTab';
 import { WorkerRecordsTab } from '@/features/marketplace/WorkerRecordsTab';
 
 type Tab =
@@ -22,6 +23,7 @@ type Tab =
   | 'live-pricing'
   | 'live-bookings'
   | 'search-radius'
+  | 'withdrawals'
   | 'terms';
 
 const TABS: { id: Tab; label: string }[] = [
@@ -35,6 +37,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'live-pricing', label: 'Live Work pricing & charges' },
   { id: 'live-bookings', label: 'Live Work bookings' },
   { id: 'search-radius', label: 'Search radius' },
+  { id: 'withdrawals', label: 'Withdrawals' },
   { id: 'terms', label: 'T&C acceptances' },
 ];
 
@@ -94,6 +97,7 @@ export function MarketplacePage({ token, onSessionExpired }: MarketplacePageProp
       {tab === 'live-pricing' && <LivePricingTab {...props} />}
       {tab === 'live-bookings' && <LiveBookingsTab {...props} />}
       {tab === 'search-radius' && <SearchRadiusTab {...props} />}
+      {tab === 'withdrawals' && <WithdrawalSettingsTab {...props} />}
       {tab === 'terms' && <TermsAcceptancesTab {...props} />}
     </section>
   );
