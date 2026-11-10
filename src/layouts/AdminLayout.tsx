@@ -13,6 +13,7 @@ import { ManagementPage } from '@/pages/ManagementPage';
 import type { AdminSection as ManagementSection } from '@/pages/ManagementPage';
 import { OverviewPage } from '@/pages/OverviewPage';
 import { PayoutsPage } from '@/pages/PayoutsPage';
+import { RoutePayoutsPage } from '@/pages/RoutePayoutsPage';
 import { RecordDetailPage } from '@/pages/RecordDetailPage';
 import { SupportPage } from '@/pages/SupportPage';
 import { WorkerDetailPage } from '@/pages/WorkerDetailPage';
@@ -31,6 +32,7 @@ const pageTitles: Record<AdminSection, string> = {
   shifts: 'Shifts',
   payments: 'Payments',
   payouts: 'Payouts',
+  'route-payouts': 'Razorpay & transfers',
   approvals: 'Approvals',
   support: 'Support',
   'work-categories': 'Work categories',
@@ -175,6 +177,8 @@ export function AdminLayout({ accessToken, onSignOut }: AdminLayoutProps) {
               onSelect={dashboard.setSelectedRecord}
               serverTotal={dashboard.recordTotals?.withdrawals}
             />
+          ) : section === 'route-payouts' ? (
+            <RoutePayoutsPage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'account-deletion' ? (
             <AccountDeletionPage token={accessToken} onSessionExpired={onSignOut} />
           ) : section === 'work-categories' ? (

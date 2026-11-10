@@ -5,6 +5,7 @@ export type AdminSection =
   | 'shifts'
   | 'payments'
   | 'payouts'
+  | 'route-payouts'
   | 'approvals'
   | 'support'
   | 'work-categories'
@@ -32,6 +33,7 @@ export const ROUTES = {
   support: '/support',
   payments: '/payments',
   payouts: '/payouts',
+  routePayouts: '/razorpay',
   notifications: '/notifications',
   settings: '/settings',
   approvals: '/approvals',
@@ -52,6 +54,7 @@ export const SECTION_ROUTES: Record<AdminSection, string> = {
   shifts: ROUTES.shifts,
   payments: ROUTES.payments,
   payouts: ROUTES.payouts,
+  'route-payouts': ROUTES.routePayouts,
   approvals: ROUTES.approvals,
   support: ROUTES.support,
   'work-categories': ROUTES.workCategories,
@@ -72,6 +75,7 @@ export const ROUTE_SECTIONS: Record<string, AdminSection> = {
   [ROUTES.shifts]: 'shifts',
   [ROUTES.payments]: 'payments',
   [ROUTES.payouts]: 'payouts',
+  [ROUTES.routePayouts]: 'route-payouts',
   [ROUTES.approvals]: 'approvals',
   [ROUTES.support]: 'support',
   [ROUTES.workCategories]: 'work-categories',
