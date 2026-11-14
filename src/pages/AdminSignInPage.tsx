@@ -64,7 +64,7 @@ export function AdminSignInPage({ onSignedIn }: AdminSignInPageProps) {
                 maxLength={254}
                 value={email}
                 onChange={event => setEmail(event.target.value)}
-                placeholder="admin@kaaamnow.com"
+                placeholder="admin@kaaamnow.in"
               />
             </div>
 
